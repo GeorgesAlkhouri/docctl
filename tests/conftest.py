@@ -74,7 +74,7 @@ def runner() -> CliRunner:
 def patch_fake_embeddings(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "docctl.services.create_embedding_function",
-        lambda model_name, allow_download: FakeEmbeddingFunction(),
+        lambda model_name, allow_download, verbose=False: FakeEmbeddingFunction(),
     )
 
 

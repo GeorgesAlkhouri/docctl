@@ -11,6 +11,7 @@ import pdfplumber
 from pypdf import PdfReader
 
 from .errors import EmptyExtractedTextError, PdfReadError
+from .text_sanitize import sanitize_text
 
 _MAX_REPEATING_LINE_LEN = 120
 _MULTIPLE_NEWLINES_RE = re.compile(r"\n{3,}")
@@ -23,7 +24,7 @@ class PageText:
 
 
 def _normalize_page_text(text: str) -> str:
-    normalized = text.replace("\r\n", "\n").replace("\r", "\n")
+    normalized = sanitize_text(text).replace("\r\n", "\n").replace("\r", "\n")
     lines = [line.rstrip() for line in normalized.split("\n")]
     joined = "\n".join(lines)
     joined = _MULTIPLE_NEWLINES_RE.sub("\n\n", joined)

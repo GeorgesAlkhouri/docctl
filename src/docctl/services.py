@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager, redirect_stderr, redirect_stdout
+import io
 import json
 import os
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 from .chunking import chunk_document_pages
 from .config import CliConfig
@@ -17,6 +19,7 @@ from .errors import (
     DocctlError,
     EmptyExtractedTextError,
     EmptyIndexSearchError,
+    InternalDocctlError,
     InputPathNotFoundError,
     WriteApprovalRequiredError,
 )
@@ -24,12 +27,22 @@ from .ids import build_doc_id, file_sha256
 from .index_store import ChromaStore
 from .models import ChunkMetadata, ChunkRecord, DoctorCheck, DoctorReport, SearchHit
 from .pdf_extract import extract_pdf_pages
+from .text_sanitize import sanitize_text
 
 _MANIFEST_FILENAME = "manifest.json"
 
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+@contextmanager
+def _suppress_external_output(*, enabled: bool):
+    if not enabled:
+        yield
+        return
+    with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+        yield
 
 
 def _relative_source(path: Path) -> str:
@@ -113,9 +126,47 @@ def _chunk_record_to_dict(record: ChunkRecord) -> dict[str, Any]:
         metadata_dict = asdict(metadata)
     return {
         "id": record.id,
-        "text": record.text,
+        "text": sanitize_text(record.text),
         "metadata": metadata_dict,
     }
+
+
+def _search_hits_from_result(
+    *,
+    result: dict[str, Any],
+    min_score: float | None,
+) -> list[dict[str, Any]]:
+    ids = (result.get("ids") or [[]])[0]
+    texts = (result.get("documents") or [[]])[0]
+    metadatas = (result.get("metadatas") or [[]])[0]
+    distances = (result.get("distances") or [[]])[0]
+
+    hits: list[dict[str, Any]] = []
+    for index, chunk_id in enumerate(ids):
+        distance = float(distances[index]) if index < len(distances) and distances[index] is not None else 0.0
+        score = 1.0 / (1.0 + distance)
+        if min_score is not None and score < min_score:
+            continue
+
+        metadata_raw = metadatas[index] if index < len(metadatas) else {}
+        metadata = ChunkMetadata(
+            doc_id=str(metadata_raw.get("doc_id", "")),
+            source=str(metadata_raw.get("source", "")),
+            title=str(metadata_raw.get("title", "")),
+            page=int(metadata_raw.get("page", 0)),
+            section=metadata_raw.get("section"),
+        )
+        hit = SearchHit(
+            rank=len(hits) + 1,
+            id=str(chunk_id),
+            text=sanitize_text(str(texts[index] if index < len(texts) else "")),
+            distance=distance,
+            score=score,
+            metadata=metadata,
+        )
+        hits.append(asdict(hit))
+
+    return hits
 
 
 def ingest_path(
@@ -134,6 +185,7 @@ def ingest_path(
     embedding_fn = create_embedding_function(
         model_name=config.embedding_model,
         allow_download=allow_model_download,
+        verbose=config.verbose,
     )
     store = ChromaStore(
         index_path=config.index_path,
@@ -235,6 +287,7 @@ def search_chunks(
     embedding_fn = create_embedding_function(
         model_name=config.embedding_model,
         allow_download=allow_model_download,
+        verbose=config.verbose,
     )
     store = ChromaStore(
         index_path=config.index_path,
@@ -249,36 +302,7 @@ def search_chunks(
 
     where = _build_where_filter(doc_id=doc_id, source=source, page=page)
     result = store.query(query=query, top_k=top_k, where=where)
-
-    ids = (result.get("ids") or [[]])[0]
-    texts = (result.get("documents") or [[]])[0]
-    metadatas = (result.get("metadatas") or [[]])[0]
-    distances = (result.get("distances") or [[]])[0]
-
-    hits: list[dict[str, Any]] = []
-    for index, chunk_id in enumerate(ids):
-        distance = float(distances[index]) if index < len(distances) and distances[index] is not None else 0.0
-        score = 1.0 / (1.0 + distance)
-        if min_score is not None and score < min_score:
-            continue
-
-        metadata_raw = metadatas[index] if index < len(metadatas) else {}
-        metadata = ChunkMetadata(
-            doc_id=str(metadata_raw.get("doc_id", "")),
-            source=str(metadata_raw.get("source", "")),
-            title=str(metadata_raw.get("title", "")),
-            page=int(metadata_raw.get("page", 0)),
-            section=metadata_raw.get("section"),
-        )
-        hit = SearchHit(
-            rank=len(hits) + 1,
-            id=str(chunk_id),
-            text=str(texts[index] if index < len(texts) else ""),
-            distance=distance,
-            score=score,
-            metadata=metadata,
-        )
-        hits.append(asdict(hit))
+    hits = _search_hits_from_result(result=result, min_score=min_score)
 
     return {
         "collection": config.collection,
@@ -328,6 +352,207 @@ def collect_stats(*, config: CliConfig) -> dict[str, object]:
     }
 
 
+class _SessionRuntime:
+    def __init__(self, *, config: CliConfig, allow_model_download: bool) -> None:
+        self._config = config
+        self._allow_model_download = allow_model_download
+        self._embedding_fn = None
+        self._search_store: ChromaStore | None = None
+        self._readonly_store: ChromaStore | None = None
+
+    def _get_embedding_fn(self) -> Any:
+        if self._embedding_fn is None:
+            self._embedding_fn = create_embedding_function(
+                model_name=self._config.embedding_model,
+                allow_download=self._allow_model_download,
+                verbose=self._config.verbose,
+            )
+        return self._embedding_fn
+
+    def _get_search_store(self) -> ChromaStore:
+        if self._search_store is None:
+            self._search_store = ChromaStore(
+                index_path=self._config.index_path,
+                collection_name=self._config.collection,
+                embedding_function=self._get_embedding_fn(),
+                create_collection=False,
+                embedding_model=self._config.embedding_model,
+            )
+        return self._search_store
+
+    def _get_readonly_store(self) -> ChromaStore:
+        if self._readonly_store is None:
+            self._readonly_store = ChromaStore(
+                index_path=self._config.index_path,
+                collection_name=self._config.collection,
+                embedding_function=None,
+                create_collection=False,
+                embedding_model=self._config.embedding_model,
+            )
+        return self._readonly_store
+
+    def search(
+        self,
+        *,
+        query: str,
+        top_k: int,
+        doc_id: str | None,
+        source: str | None,
+        page: int | None,
+        min_score: float | None,
+    ) -> dict[str, object]:
+        store = self._get_search_store()
+        if store.count() == 0:
+            raise EmptyIndexSearchError("search cannot run on an empty index")
+        where = _build_where_filter(doc_id=doc_id, source=source, page=page)
+        result = store.query(query=query, top_k=top_k, where=where)
+        hits = _search_hits_from_result(result=result, min_score=min_score)
+        return {
+            "collection": self._config.collection,
+            "hits": hits,
+            "index_path": str(self._config.index_path),
+            "query": query,
+            "top_k": top_k,
+        }
+
+    def show(self, *, chunk_id: str) -> dict[str, object]:
+        record = self._get_readonly_store().get_chunk(chunk_id=chunk_id)
+        return _chunk_record_to_dict(record)
+
+    def stats(self) -> dict[str, object]:
+        manifest = _load_manifest(self._config.index_path)
+        documents = manifest.get("documents", {})
+        store = self._get_readonly_store()
+        return {
+            "collection": self._config.collection,
+            "chunk_count": store.count(),
+            "document_count": len(documents),
+            "embedding_model": manifest.get("embedding_model", self._config.embedding_model),
+            "index_path": str(self._config.index_path),
+            "last_ingest_at": manifest.get("last_ingest_at"),
+        }
+
+    def doctor(self) -> dict[str, object]:
+        report = run_doctor(config=self._config, allow_model_download=self._allow_model_download)
+        return asdict(report)
+
+
+def _to_optional_str(value: Any, *, field_name: str) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value
+    raise DocctlError(message=f"invalid session request field '{field_name}'", exit_code=50)
+
+
+def _to_optional_int(value: Any, *, field_name: str, minimum: int | None = None) -> int | None:
+    if value is None:
+        return None
+    if not isinstance(value, int):
+        raise DocctlError(message=f"invalid session request field '{field_name}'", exit_code=50)
+    if minimum is not None and value < minimum:
+        raise DocctlError(message=f"invalid session request field '{field_name}'", exit_code=50)
+    return value
+
+
+def _to_optional_float(
+    value: Any, *, field_name: str, minimum: float | None = None, maximum: float | None = None
+) -> float | None:
+    if value is None:
+        return None
+    if not isinstance(value, (float, int)):
+        raise DocctlError(message=f"invalid session request field '{field_name}'", exit_code=50)
+    parsed = float(value)
+    if minimum is not None and parsed < minimum:
+        raise DocctlError(message=f"invalid session request field '{field_name}'", exit_code=50)
+    if maximum is not None and parsed > maximum:
+        raise DocctlError(message=f"invalid session request field '{field_name}'", exit_code=50)
+    return parsed
+
+
+def _session_error(*, request_id: Any, error: Exception) -> dict[str, Any]:
+    if isinstance(error, DocctlError):
+        exit_code = error.exit_code
+        message = str(error)
+    else:
+        fallback = InternalDocctlError("unexpected internal error")
+        exit_code = fallback.exit_code
+        message = str(error)
+    return {
+        "id": request_id,
+        "ok": False,
+        "error": {"message": message, "exit_code": exit_code},
+    }
+
+
+def run_session_requests(
+    *,
+    config: CliConfig,
+    request_lines: Iterable[str],
+    allow_model_download: bool,
+) -> Iterable[dict[str, Any]]:
+    runtime = _SessionRuntime(config=config, allow_model_download=allow_model_download)
+
+    for raw_line in request_lines:
+        line = raw_line.strip()
+        if not line:
+            continue
+
+        request_id: Any = None
+        try:
+            payload = json.loads(line)
+            if not isinstance(payload, dict):
+                raise DocctlError(message="invalid session request payload", exit_code=50)
+
+            request_id = payload.get("id")
+            op = payload.get("op")
+            if not isinstance(op, str):
+                raise DocctlError(message="invalid session request field 'op'", exit_code=50)
+
+            with _suppress_external_output(enabled=not config.verbose):
+                if op == "search":
+                    query = payload.get("query")
+                    if not isinstance(query, str) or not query.strip():
+                        raise DocctlError(message="invalid session request field 'query'", exit_code=50)
+
+                    top_k_value = payload.get("top_k", 5)
+                    if not isinstance(top_k_value, int) or top_k_value < 1 or top_k_value > 100:
+                        raise DocctlError(message="invalid session request field 'top_k'", exit_code=50)
+
+                    result = runtime.search(
+                        query=query,
+                        top_k=top_k_value,
+                        doc_id=_to_optional_str(payload.get("doc_id"), field_name="doc_id"),
+                        source=_to_optional_str(payload.get("source"), field_name="source"),
+                        page=_to_optional_int(payload.get("page"), field_name="page", minimum=1),
+                        min_score=_to_optional_float(
+                            payload.get("min_score"),
+                            field_name="min_score",
+                            minimum=0.0,
+                            maximum=1.0,
+                        ),
+                    )
+                elif op == "show":
+                    chunk_id = payload.get("chunk_id")
+                    if not isinstance(chunk_id, str) or not chunk_id:
+                        raise DocctlError(message="invalid session request field 'chunk_id'", exit_code=50)
+                    result = runtime.show(chunk_id=chunk_id)
+                elif op == "stats":
+                    result = runtime.stats()
+                elif op == "doctor":
+                    result = runtime.doctor()
+                else:
+                    raise DocctlError(message=f"unsupported session operation: {op}", exit_code=50)
+
+            yield {
+                "id": request_id,
+                "ok": True,
+                "result": result,
+            }
+        except Exception as error:  # noqa: BLE001
+            yield _session_error(request_id=request_id, error=error)
+
+
 def run_doctor(*, config: CliConfig, allow_model_download: bool) -> DoctorReport:
     checks: list[DoctorCheck] = []
     warnings: list[str] = []
@@ -351,6 +576,7 @@ def run_doctor(*, config: CliConfig, allow_model_download: bool) -> DoctorReport
         embedding_fn = create_embedding_function(
             model_name=config.embedding_model,
             allow_download=allow_model_download,
+            verbose=config.verbose,
         )
         embedding_ok = True
         checks.append(

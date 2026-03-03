@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from dataclasses import asdict
+import io
 import os
 from pathlib import Path
+import sys
 from typing import Any
 
 import typer
@@ -20,7 +23,7 @@ from .config import (
 from .errors import DocctlError, EmbeddingConfigError, InternalDocctlError
 from .jsonio import dumps_json
 from .models import DoctorReport
-from .services import collect_stats, ingest_path, run_doctor, search_chunks, show_chunk
+from .services import collect_stats, ingest_path, run_doctor, run_session_requests, search_chunks, show_chunk
 
 app = typer.Typer(
     add_completion=False,
@@ -49,6 +52,16 @@ def _emit_doctor(*, config: CliConfig, report: DoctorReport) -> None:
         typer.echo(f"warning: {warning}")
     for error in report.errors:
         typer.echo(f"error: {error}")
+
+
+@contextmanager
+def _machine_output_guard(*, enabled: bool):
+    if not enabled:
+        yield
+        return
+
+    with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+        yield
 
 
 def _handle_error(error: Exception) -> None:
@@ -111,15 +124,16 @@ def ingest(
 ) -> None:
     config = ctx.obj
     try:
-        payload = ingest_path(
-            config=config,
-            input_path=path,
-            recursive=recursive,
-            glob_pattern=glob_pattern,
-            force=force,
-            approve_write=approve_write,
-            allow_model_download=allow_model_download,
-        )
+        with _machine_output_guard(enabled=config.json_output and not config.verbose):
+            payload = ingest_path(
+                config=config,
+                input_path=path,
+                recursive=recursive,
+                glob_pattern=glob_pattern,
+                force=force,
+                approve_write=approve_write,
+                allow_model_download=allow_model_download,
+            )
         _emit_success(config=config, payload=payload)
     except Exception as error:  # noqa: BLE001
         _handle_error(error)
@@ -142,16 +156,17 @@ def search(
 ) -> None:
     config = ctx.obj
     try:
-        payload = search_chunks(
-            config=config,
-            query=query,
-            top_k=top_k,
-            doc_id=doc_id,
-            source=source,
-            page=page,
-            min_score=min_score,
-            allow_model_download=allow_model_download,
-        )
+        with _machine_output_guard(enabled=config.json_output and not config.verbose):
+            payload = search_chunks(
+                config=config,
+                query=query,
+                top_k=top_k,
+                doc_id=doc_id,
+                source=source,
+                page=page,
+                min_score=min_score,
+                allow_model_download=allow_model_download,
+            )
         _emit_success(config=config, payload=payload)
     except Exception as error:  # noqa: BLE001
         _handle_error(error)
@@ -169,7 +184,8 @@ def show(
 ) -> None:
     config = ctx.obj
     try:
-        payload = show_chunk(config=config, chunk_id=chunk_id, allow_model_download=allow_model_download)
+        with _machine_output_guard(enabled=config.json_output and not config.verbose):
+            payload = show_chunk(config=config, chunk_id=chunk_id, allow_model_download=allow_model_download)
         _emit_success(config=config, payload=payload)
     except Exception as error:  # noqa: BLE001
         _handle_error(error)
@@ -179,7 +195,8 @@ def show(
 def stats(ctx: typer.Context) -> None:
     config = ctx.obj
     try:
-        payload = collect_stats(config=config)
+        with _machine_output_guard(enabled=config.json_output and not config.verbose):
+            payload = collect_stats(config=config)
         _emit_success(config=config, payload=payload)
     except Exception as error:  # noqa: BLE001
         _handle_error(error)
@@ -196,10 +213,33 @@ def doctor(
 ) -> None:
     config = ctx.obj
     try:
-        report = run_doctor(config=config, allow_model_download=allow_model_download)
+        with _machine_output_guard(enabled=config.json_output and not config.verbose):
+            report = run_doctor(config=config, allow_model_download=allow_model_download)
         _emit_doctor(config=config, report=report)
         if not report.ok:
             raise EmbeddingConfigError("doctor checks failed")
+    except Exception as error:  # noqa: BLE001
+        _handle_error(error)
+
+
+@app.command(help="Run a read-only NDJSON request session on stdin/stdout.")
+def session(
+    ctx: typer.Context,
+    allow_model_download: bool = typer.Option(
+        False,
+        "--allow-model-download",
+        help="Allow downloading missing embedding model artifacts.",
+    ),
+) -> None:
+    config = ctx.obj
+    try:
+        responses = run_session_requests(
+            config=config,
+            request_lines=sys.stdin,
+            allow_model_download=allow_model_download,
+        )
+        for response in responses:
+            typer.echo(dumps_json(response))
     except Exception as error:  # noqa: BLE001
         _handle_error(error)
 

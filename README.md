@@ -29,6 +29,7 @@ Main commands:
 - `docctl show <chunk_id>`
 - `docctl stats`
 - `docctl doctor`
+- `docctl session` (read-only NDJSON batch/session mode)
 
 Global options:
 - `--index-path` (default: `./.docctl`)
@@ -41,6 +42,14 @@ Global options:
 uv run docctl --json ingest ./docs --recursive --allow-model-download
 uv run docctl --json search "security gateway diagnostics" --top-k 5 --allow-model-download
 uv run docctl --json show <chunk_id>
+```
+
+## NDJSON Session Workflow
+```bash
+cat <<'EOF' | uv run docctl --index-path ./.docctl --collection default session
+{"id":"q1","op":"search","query":"security gateway diagnostics","top_k":5}
+{"id":"q2","op":"stats"}
+EOF
 ```
 
 ## Tests

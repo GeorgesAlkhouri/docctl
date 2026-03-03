@@ -13,3 +13,4 @@ def test_commands_exist() -> None:
     assert "show" in result.output
     assert "stats" in result.output
     assert "doctor" in result.output
+    assert "session" in result.output
