@@ -125,3 +125,24 @@ def test_invalid_embedding_config_exit_code_40(runner, tmp_path: Path) -> None:
 
     assert result.exit_code == 40
     assert "failed to load embedding model" in result.output
+
+
+def test_stats_on_uninitialized_index_exit_code_20_has_actionable_message(runner, tmp_path: Path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "--index-path",
+            str(tmp_path / "fresh-index"),
+            "--collection",
+            "test",
+            "--json",
+            "stats",
+        ],
+    )
+
+    output = result.output.lower()
+
+    assert result.exit_code == 20
+    assert "index is not initialized" in output
+    assert "run `docctl ingest <path>` first" in output
+    assert "--index-path" in output

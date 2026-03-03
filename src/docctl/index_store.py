@@ -31,7 +31,11 @@ class ChromaStore:
         if create_collection:
             self.chroma_path.mkdir(parents=True, exist_ok=True)
         elif not self.chroma_path.exists():
-            raise IndexNotInitializedError(f"missing index directory: {self.chroma_path}")
+            raise IndexNotInitializedError(
+                "index is not initialized at "
+                f"{self.chroma_path}. "
+                "Run `docctl ingest <path>` first, or set `--index-path` to an existing index."
+            )
 
         self.client = chromadb.PersistentClient(path=str(self.chroma_path))
 
