@@ -83,7 +83,9 @@ class ChromaStore:
     def delete_by_doc_id(self, doc_id: str) -> None:
         self.collection.delete(where={"doc_id": doc_id})
 
-    def query(self, *, query: str, top_k: int, where: dict[str, Any] | None = None) -> dict[str, Any]:
+    def query(
+        self, *, query: str, top_k: int, where: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         return self.collection.query(
             query_texts=[query],
             n_results=top_k,

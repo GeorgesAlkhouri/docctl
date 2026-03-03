@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from contextlib import contextmanager, redirect_stderr, redirect_stdout
 import io
 import json
 import os
+from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -19,8 +19,8 @@ from .errors import (
     DocctlError,
     EmptyExtractedTextError,
     EmptyIndexSearchError,
-    InternalDocctlError,
     InputPathNotFoundError,
+    InternalDocctlError,
     WriteApprovalRequiredError,
 )
 from .ids import build_doc_id, file_sha256
@@ -62,7 +62,9 @@ def _discover_pdf_files(*, input_path: Path, recursive: bool, glob_pattern: str)
         return [input_path.resolve()]
 
     iterator = input_path.rglob(glob_pattern) if recursive else input_path.glob(glob_pattern)
-    files = sorted(path.resolve() for path in iterator if path.is_file() and path.suffix.lower() == ".pdf")
+    files = sorted(
+        path.resolve() for path in iterator if path.is_file() and path.suffix.lower() == ".pdf"
+    )
     if not files:
         raise InputPathNotFoundError(f"no PDF files matched under: {input_path}")
     return files
@@ -102,7 +104,9 @@ def _require_write_approval(*, config: CliConfig, approve_write: bool) -> None:
         )
 
 
-def _build_where_filter(*, doc_id: str | None, source: str | None, page: int | None) -> dict[str, Any] | None:
+def _build_where_filter(
+    *, doc_id: str | None, source: str | None, page: int | None
+) -> dict[str, Any] | None:
     conditions: list[dict[str, Any]] = []
     if doc_id:
         conditions.append({"doc_id": doc_id})
@@ -143,7 +147,11 @@ def _search_hits_from_result(
 
     hits: list[dict[str, Any]] = []
     for index, chunk_id in enumerate(ids):
-        distance = float(distances[index]) if index < len(distances) and distances[index] is not None else 0.0
+        distance = (
+            float(distances[index])
+            if index < len(distances) and distances[index] is not None
+            else 0.0
+        )
         score = 1.0 / (1.0 + distance)
         if min_score is not None and score < min_score:
             continue
@@ -181,7 +189,9 @@ def ingest_path(
 ) -> dict[str, object]:
     _require_write_approval(config=config, approve_write=approve_write)
 
-    files = _discover_pdf_files(input_path=input_path, recursive=recursive, glob_pattern=glob_pattern)
+    files = _discover_pdf_files(
+        input_path=input_path, recursive=recursive, glob_pattern=glob_pattern
+    )
     embedding_fn = create_embedding_function(
         model_name=config.embedding_model,
         allow_download=allow_model_download,
@@ -313,7 +323,9 @@ def search_chunks(
     }
 
 
-def show_chunk(*, config: CliConfig, chunk_id: str, allow_model_download: bool) -> dict[str, object]:
+def show_chunk(
+    *, config: CliConfig, chunk_id: str, allow_model_download: bool
+) -> dict[str, object]:
     _ = allow_model_download
     store = ChromaStore(
         index_path=config.index_path,
@@ -513,11 +525,15 @@ def run_session_requests(
                 if op == "search":
                     query = payload.get("query")
                     if not isinstance(query, str) or not query.strip():
-                        raise DocctlError(message="invalid session request field 'query'", exit_code=50)
+                        raise DocctlError(
+                            message="invalid session request field 'query'", exit_code=50
+                        )
 
                     top_k_value = payload.get("top_k", 5)
                     if not isinstance(top_k_value, int) or top_k_value < 1 or top_k_value > 100:
-                        raise DocctlError(message="invalid session request field 'top_k'", exit_code=50)
+                        raise DocctlError(
+                            message="invalid session request field 'top_k'", exit_code=50
+                        )
 
                     result = runtime.search(
                         query=query,
@@ -535,7 +551,9 @@ def run_session_requests(
                 elif op == "show":
                     chunk_id = payload.get("chunk_id")
                     if not isinstance(chunk_id, str) or not chunk_id:
-                        raise DocctlError(message="invalid session request field 'chunk_id'", exit_code=50)
+                        raise DocctlError(
+                            message="invalid session request field 'chunk_id'", exit_code=50
+                        )
                     result = runtime.show(chunk_id=chunk_id)
                 elif op == "stats":
                     result = runtime.stats()
@@ -628,7 +646,9 @@ def run_doctor(*, config: CliConfig, allow_model_download: bool) -> DoctorReport
                 DoctorCheck(
                     name="test_query",
                     ok=query_ok,
-                    message="test query returned at least one hit" if query_ok else "test query returned no hits",
+                    message="test query returned at least one hit"
+                    if query_ok
+                    else "test query returned no hits",
                 )
             )
             if not query_ok:

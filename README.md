@@ -57,6 +57,18 @@ EOF
 uv run pytest tests/unit tests/integration tests/acceptance -q
 ```
 
+## Lint And Format
+```bash
+make lint
+make format-check
+```
+
+Autofix:
+
+```bash
+make format
+```
+
 ## Contributor Onboarding
 Before making changes, read:
 1. [AGENTS.md](AGENTS.md)

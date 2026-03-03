@@ -59,7 +59,9 @@ def test_write_approval_required_exit_code_21(runner, make_pdf, tmp_path: Path) 
     assert "write approval is required" in result.output
 
 
-def test_search_on_empty_collection_exit_code_30(runner, patch_fake_embeddings, tmp_path: Path) -> None:
+def test_search_on_empty_collection_exit_code_30(
+    runner, patch_fake_embeddings, tmp_path: Path
+) -> None:
     index_path = tmp_path / "index"
     chroma_path = index_path / "chroma"
     chroma_path.mkdir(parents=True, exist_ok=True)
@@ -127,7 +129,9 @@ def test_invalid_embedding_config_exit_code_40(runner, tmp_path: Path) -> None:
     assert "failed to load embedding model" in result.output
 
 
-def test_stats_on_uninitialized_index_exit_code_20_has_actionable_message(runner, tmp_path: Path) -> None:
+def test_stats_on_uninitialized_index_exit_code_20_has_actionable_message(
+    runner, tmp_path: Path
+) -> None:
     result = runner.invoke(
         app,
         [

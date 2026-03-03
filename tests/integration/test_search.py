@@ -10,7 +10,9 @@ def _json(output: str) -> dict:
     return json.loads(output.strip())
 
 
-def test_search_json_contract_with_metadata(runner, make_pdf, patch_fake_embeddings, tmp_path: Path) -> None:
+def test_search_json_contract_with_metadata(
+    runner, make_pdf, patch_fake_embeddings, tmp_path: Path
+) -> None:
     pdf_path = make_pdf(
         tmp_path / "searchable.pdf",
         [
@@ -22,7 +24,15 @@ def test_search_json_contract_with_metadata(runner, make_pdf, patch_fake_embeddi
 
     ingest_result = runner.invoke(
         app,
-        ["--index-path", str(index_path), "--collection", "test", "--json", "ingest", str(pdf_path)],
+        [
+            "--index-path",
+            str(index_path),
+            "--collection",
+            "test",
+            "--json",
+            "ingest",
+            str(pdf_path),
+        ],
     )
     assert ingest_result.exit_code == 0, ingest_result.output
 

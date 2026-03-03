@@ -16,7 +16,15 @@ def test_stats_json_output(runner, make_pdf, patch_fake_embeddings, tmp_path: Pa
 
     ingest_result = runner.invoke(
         app,
-        ["--index-path", str(index_path), "--collection", "test", "--json", "ingest", str(pdf_path)],
+        [
+            "--index-path",
+            str(index_path),
+            "--collection",
+            "test",
+            "--json",
+            "ingest",
+            str(pdf_path),
+        ],
     )
     assert ingest_result.exit_code == 0, ingest_result.output
 
@@ -41,7 +49,15 @@ def test_doctor_json_output(runner, make_pdf, patch_fake_embeddings, tmp_path: P
 
     ingest_result = runner.invoke(
         app,
-        ["--index-path", str(index_path), "--collection", "test", "--json", "ingest", str(pdf_path)],
+        [
+            "--index-path",
+            str(index_path),
+            "--collection",
+            "test",
+            "--json",
+            "ingest",
+            str(pdf_path),
+        ],
     )
     assert ingest_result.exit_code == 0, ingest_result.output
 

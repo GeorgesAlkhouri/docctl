@@ -19,7 +19,15 @@ def test_show_chunk_by_id(runner, make_pdf, patch_fake_embeddings, tmp_path: Pat
 
     ingest_result = runner.invoke(
         app,
-        ["--index-path", str(index_path), "--collection", "test", "--json", "ingest", str(pdf_path)],
+        [
+            "--index-path",
+            str(index_path),
+            "--collection",
+            "test",
+            "--json",
+            "ingest",
+            str(pdf_path),
+        ],
     )
     assert ingest_result.exit_code == 0, ingest_result.output
 

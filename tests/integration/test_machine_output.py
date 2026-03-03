@@ -69,11 +69,15 @@ def _json(output: str) -> dict:
     return json.loads(output.strip())
 
 
-def test_json_search_ignores_noisy_embedding_output(runner, make_pdf, monkeypatch, tmp_path: Path) -> None:
+def test_json_search_ignores_noisy_embedding_output(
+    runner, make_pdf, monkeypatch, tmp_path: Path
+) -> None:
     pdf_path = make_pdf(tmp_path / "doc.pdf", ["A clean sentence for retrieval."])
     index_path = tmp_path / "index"
 
-    def noisy_factory(model_name: str, allow_download: bool, verbose: bool = False) -> _FakeEmbeddingFunction:
+    def noisy_factory(
+        model_name: str, allow_download: bool, verbose: bool = False
+    ) -> _FakeEmbeddingFunction:
         _ = (model_name, allow_download, verbose)
         print("Loading weights ...")
         print("progress: 10%", file=sys.stderr)
@@ -83,7 +87,15 @@ def test_json_search_ignores_noisy_embedding_output(runner, make_pdf, monkeypatc
 
     ingest_result = runner.invoke(
         app,
-        ["--index-path", str(index_path), "--collection", "test", "--json", "ingest", str(pdf_path)],
+        [
+            "--index-path",
+            str(index_path),
+            "--collection",
+            "test",
+            "--json",
+            "ingest",
+            str(pdf_path),
+        ],
     )
     assert ingest_result.exit_code == 0, ingest_result.output
     ingest_payload = _json(ingest_result.output)
@@ -106,13 +118,23 @@ def test_json_search_ignores_noisy_embedding_output(runner, make_pdf, monkeypatc
     assert "hits" in search_payload
 
 
-def test_search_json_output_sanitizes_control_chars(runner, make_pdf, patch_fake_embeddings, monkeypatch, tmp_path: Path) -> None:
+def test_search_json_output_sanitizes_control_chars(
+    runner, make_pdf, patch_fake_embeddings, monkeypatch, tmp_path: Path
+) -> None:
     pdf_path = make_pdf(tmp_path / "doc.pdf", ["Baseline text for index initialization."])
     index_path = tmp_path / "index"
 
     ingest_result = runner.invoke(
         app,
-        ["--index-path", str(index_path), "--collection", "test", "--json", "ingest", str(pdf_path)],
+        [
+            "--index-path",
+            str(index_path),
+            "--collection",
+            "test",
+            "--json",
+            "ingest",
+            str(pdf_path),
+        ],
     )
     assert ingest_result.exit_code == 0, ingest_result.output
 
@@ -122,7 +144,9 @@ def test_search_json_output_sanitizes_control_chars(runner, make_pdf, patch_fake
         lambda self, query, top_k, where=None: {
             "ids": [["legacy"]],
             "documents": [["A\x00B\x1fC"]],
-            "metadatas": [[{"doc_id": "d", "source": "s", "title": "t", "page": 1, "section": None}]],
+            "metadatas": [
+                [{"doc_id": "d", "source": "s", "title": "t", "page": 1, "section": None}]
+            ],
             "distances": [[0.0]],
         },
     )
@@ -137,13 +161,23 @@ def test_search_json_output_sanitizes_control_chars(runner, make_pdf, patch_fake
     assert payload["hits"][0]["text"] == "ABC"
 
 
-def test_show_json_output_sanitizes_control_chars(runner, make_pdf, patch_fake_embeddings, monkeypatch, tmp_path: Path) -> None:
+def test_show_json_output_sanitizes_control_chars(
+    runner, make_pdf, patch_fake_embeddings, monkeypatch, tmp_path: Path
+) -> None:
     pdf_path = make_pdf(tmp_path / "doc.pdf", ["Baseline text for index initialization."])
     index_path = tmp_path / "index"
 
     ingest_result = runner.invoke(
         app,
-        ["--index-path", str(index_path), "--collection", "test", "--json", "ingest", str(pdf_path)],
+        [
+            "--index-path",
+            str(index_path),
+            "--collection",
+            "test",
+            "--json",
+            "ingest",
+            str(pdf_path),
+        ],
     )
     assert ingest_result.exit_code == 0, ingest_result.output
 
@@ -158,7 +192,15 @@ def test_show_json_output_sanitizes_control_chars(runner, make_pdf, patch_fake_e
 
     result = runner.invoke(
         app,
-        ["--index-path", str(index_path), "--collection", "test", "--json", "show", "legacy-chunk-id"],
+        [
+            "--index-path",
+            str(index_path),
+            "--collection",
+            "test",
+            "--json",
+            "show",
+            "legacy-chunk-id",
+        ],
     )
 
     assert result.exit_code == 0, result.output

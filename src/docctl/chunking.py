@@ -51,7 +51,9 @@ def chunk_document_pages(
         if not text:
             continue
 
-        chunk_id = build_chunk_id(doc_id=doc_id, page=page_value, chunk_index=chunk_index, text=text)
+        chunk_id = build_chunk_id(
+            doc_id=doc_id, page=page_value, chunk_index=chunk_index, text=text
+        )
         records.append(
             ChunkRecord(
                 id=chunk_id,

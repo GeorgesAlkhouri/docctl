@@ -19,4 +19,6 @@ def _to_serializable(value: Any) -> Any:
 
 def dumps_json(payload: Any) -> str:
     """Serialize payload to deterministic JSON."""
-    return json.dumps(_to_serializable(payload), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return json.dumps(
+        _to_serializable(payload), ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    )

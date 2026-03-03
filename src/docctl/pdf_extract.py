@@ -64,7 +64,10 @@ def _strip_repeating_headers_and_footers(pages: list[PageText]) -> list[PageText
 def _extract_with_pdfplumber(path: Path) -> list[PageText]:
     try:
         with pdfplumber.open(path) as pdf:
-            return [PageText(page=index, text=(page.extract_text() or "")) for index, page in enumerate(pdf.pages, start=1)]
+            return [
+                PageText(page=index, text=(page.extract_text() or ""))
+                for index, page in enumerate(pdf.pages, start=1)
+            ]
     except Exception as error:  # noqa: BLE001
         raise PdfReadError(f"failed to read PDF with pdfplumber: {path} ({error})") from error
 
@@ -72,7 +75,10 @@ def _extract_with_pdfplumber(path: Path) -> list[PageText]:
 def _extract_with_pypdf(path: Path) -> list[PageText]:
     try:
         reader = PdfReader(str(path))
-        return [PageText(page=index, text=(page.extract_text() or "")) for index, page in enumerate(reader.pages, start=1)]
+        return [
+            PageText(page=index, text=(page.extract_text() or ""))
+            for index, page in enumerate(reader.pages, start=1)
+        ]
     except Exception as error:  # noqa: BLE001
         raise PdfReadError(f"failed to read PDF with pypdf fallback: {path} ({error})") from error
 
@@ -86,7 +92,9 @@ def extract_pdf_pages(path: Path) -> list[PageText]:
     except PdfReadError:
         extracted = _extract_with_pypdf(path)
 
-    normalized = [PageText(page=page.page, text=_normalize_page_text(page.text)) for page in extracted]
+    normalized = [
+        PageText(page=page.page, text=_normalize_page_text(page.text)) for page in extracted
+    ]
     normalized = _strip_repeating_headers_and_footers(normalized)
     non_empty_pages = [page for page in normalized if page.text.strip()]
 

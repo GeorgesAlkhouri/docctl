@@ -2,28 +2,35 @@
 
 from __future__ import annotations
 
-from contextlib import contextmanager, redirect_stderr, redirect_stdout
-from dataclasses import asdict
 import io
 import os
-from pathlib import Path
 import sys
+from contextlib import contextmanager, redirect_stderr, redirect_stdout
+from dataclasses import asdict
+from pathlib import Path
 from typing import Any
 
 import typer
 
 from .config import (
-    CliConfig,
     DEFAULT_COLLECTION,
     DEFAULT_EMBEDDING_MODEL,
     DEFAULT_INDEX_PATH,
     ENV_EMBEDDING_MODEL,
     ENV_REQUIRE_WRITE_APPROVAL,
+    CliConfig,
 )
 from .errors import DocctlError, EmbeddingConfigError, InternalDocctlError
 from .jsonio import dumps_json
 from .models import DoctorReport
-from .services import collect_stats, ingest_path, run_doctor, run_session_requests, search_chunks, show_chunk
+from .services import (
+    collect_stats,
+    ingest_path,
+    run_doctor,
+    run_session_requests,
+    search_chunks,
+    show_chunk,
+)
 
 app = typer.Typer(
     add_completion=False,
@@ -115,7 +122,9 @@ def ingest(
     recursive: bool = typer.Option(False, "--recursive", help="Scan directories recursively."),
     glob_pattern: str = typer.Option("*.pdf", "--glob", help="Glob pattern for file discovery."),
     force: bool = typer.Option(False, "--force", help="Force reingestion of known documents."),
-    approve_write: bool = typer.Option(False, "--approve-write", help="Explicitly approve mutating writes."),
+    approve_write: bool = typer.Option(
+        False, "--approve-write", help="Explicitly approve mutating writes."
+    ),
     allow_model_download: bool = typer.Option(
         False,
         "--allow-model-download",
@@ -147,7 +156,9 @@ def search(
     doc_id: str | None = typer.Option(None, "--doc-id", help="Filter by document id."),
     source: str | None = typer.Option(None, "--source", help="Filter by source path."),
     page: int | None = typer.Option(None, "--page", min=1, help="Filter by page number."),
-    min_score: float | None = typer.Option(None, "--min-score", min=0.0, max=1.0, help="Minimum score."),
+    min_score: float | None = typer.Option(
+        None, "--min-score", min=0.0, max=1.0, help="Minimum score."
+    ),
     allow_model_download: bool = typer.Option(
         False,
         "--allow-model-download",
@@ -185,7 +196,9 @@ def show(
     config = ctx.obj
     try:
         with _machine_output_guard(enabled=config.json_output and not config.verbose):
-            payload = show_chunk(config=config, chunk_id=chunk_id, allow_model_download=allow_model_download)
+            payload = show_chunk(
+                config=config, chunk_id=chunk_id, allow_model_download=allow_model_download
+            )
         _emit_success(config=config, payload=payload)
     except Exception as error:  # noqa: BLE001
         _handle_error(error)

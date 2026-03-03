@@ -1,17 +1,31 @@
 SHELL := /bin/zsh
 UV ?= uv
 
-.PHONY: sync test check-markdown-links help
+.PHONY: sync test lint format format-check check-markdown-links help
 
 help:
 	@echo "Targets:"
 	@echo "  make sync  - install/update dependencies via uv"
+	@echo "  make lint  - run ruff lint checks"
+	@echo "  make format - apply ruff formatter"
+	@echo "  make format-check - verify ruff formatting"
 	@echo "  make test  - run unit, integration and acceptance tests"
 	@echo "  make check-markdown-links - validate markdown links with lychee"
 
 sync:
 	$(UV) lock
 	$(UV) sync
+
+lint:
+	$(UV) run ruff check src tests
+
+format:
+	$(UV) run ruff check src tests --fix
+	$(UV) run ruff format src tests
+
+format-check:
+	$(UV) run ruff check src tests
+	$(UV) run ruff format --check src tests
 
 test:
 	$(UV) run pytest tests/unit tests/integration tests/acceptance -q

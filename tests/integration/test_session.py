@@ -63,7 +63,9 @@ class _FakeEmbeddingFunction:
         return [self._vectorize(item) for item in input]
 
 
-def test_session_reuses_embedding_model_for_multiple_searches(runner, make_pdf, monkeypatch, tmp_path: Path) -> None:
+def test_session_reuses_embedding_model_for_multiple_searches(
+    runner, make_pdf, monkeypatch, tmp_path: Path
+) -> None:
     pdf_path = make_pdf(
         tmp_path / "doc.pdf",
         ["Vehicle diagnostics and retrieval text.", "Another diagnostics paragraph."],
@@ -71,7 +73,9 @@ def test_session_reuses_embedding_model_for_multiple_searches(runner, make_pdf, 
     index_path = tmp_path / "index"
     create_calls = {"count": 0}
 
-    def counting_factory(model_name: str, allow_download: bool, verbose: bool = False) -> _FakeEmbeddingFunction:
+    def counting_factory(
+        model_name: str, allow_download: bool, verbose: bool = False
+    ) -> _FakeEmbeddingFunction:
         _ = (model_name, allow_download, verbose)
         create_calls["count"] += 1
         return _FakeEmbeddingFunction()
@@ -80,7 +84,15 @@ def test_session_reuses_embedding_model_for_multiple_searches(runner, make_pdf, 
 
     ingest_result = runner.invoke(
         app,
-        ["--index-path", str(index_path), "--collection", "test", "--json", "ingest", str(pdf_path)],
+        [
+            "--index-path",
+            str(index_path),
+            "--collection",
+            "test",
+            "--json",
+            "ingest",
+            str(pdf_path),
+        ],
     )
     assert ingest_result.exit_code == 0, ingest_result.output
     assert create_calls["count"] == 1

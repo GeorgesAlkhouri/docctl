@@ -43,7 +43,9 @@ def test_ingest_single_pdf_json(runner, make_pdf, patch_fake_embeddings, tmp_pat
     assert payload["errors"] == []
 
 
-def test_ingest_directory_recursive_json(runner, make_pdf, patch_fake_embeddings, tmp_path: Path) -> None:
+def test_ingest_directory_recursive_json(
+    runner, make_pdf, patch_fake_embeddings, tmp_path: Path
+) -> None:
     root = tmp_path / "docs"
     make_pdf(root / "a.pdf", ["Page one sentence. Page one sentence two."])
     make_pdf(root / "nested" / "b.pdf", ["Another document sentence."])
