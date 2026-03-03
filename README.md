@@ -47,3 +47,12 @@ uv run docctl --json show <chunk_id>
 ```bash
 uv run pytest tests/unit tests/integration tests/acceptance -q
 ```
+
+## Contributor Onboarding
+Before making changes, read:
+1. [AGENTS.md](AGENTS.md)
+2. [ARCHITECTURE.md](ARCHITECTURE.md)
+3. Relevant indexes under `docs/`:
+   - [docs/design-docs/index.md](docs/design-docs/index.md)
+   - [docs/product-specs/index.md](docs/product-specs/index.md)
+   - [docs/references/index.md](docs/references/index.md)
