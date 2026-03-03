@@ -11,6 +11,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
+from chromadb.api.types import Documents, EmbeddingFunction
+
 from .chunking import chunk_document_pages
 from .config import CliConfig
 from .embeddings import create_embedding_function
@@ -368,11 +370,11 @@ class _SessionRuntime:
     def __init__(self, *, config: CliConfig, allow_model_download: bool) -> None:
         self._config = config
         self._allow_model_download = allow_model_download
-        self._embedding_fn = None
+        self._embedding_fn: EmbeddingFunction[Documents] | None = None
         self._search_store: ChromaStore | None = None
         self._readonly_store: ChromaStore | None = None
 
-    def _get_embedding_fn(self) -> Any:
+    def _get_embedding_fn(self) -> EmbeddingFunction[Documents]:
         if self._embedding_fn is None:
             self._embedding_fn = create_embedding_function(
                 model_name=self._config.embedding_model,

@@ -2,14 +2,36 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import chromadb
-from chromadb.api.types import Documents, EmbeddingFunction
+from chromadb.api.types import Documents, Embeddable, EmbeddingFunction, Metadata, Where
 
 from .errors import ChunkNotFoundError, IndexNotInitializedError
 from .models import ChunkMetadata, ChunkRecord
+
+
+def _as_int(value: object, *, default: int = 0) -> int:
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except ValueError:
+            return default
+    return default
+
+
+def _as_optional_str(value: object) -> str | None:
+    if isinstance(value, str):
+        return value
+    return None
 
 
 class ChromaStore:
@@ -38,11 +60,12 @@ class ChromaStore:
             )
 
         self.client = chromadb.PersistentClient(path=str(self.chroma_path))
+        chroma_embedding_fn = cast(EmbeddingFunction[Embeddable] | None, embedding_function)
 
         if create_collection:
             self.collection = self.client.get_or_create_collection(
                 name=collection_name,
-                embedding_function=embedding_function,
+                embedding_function=chroma_embedding_fn,
                 metadata={"embedding_model": embedding_model},
             )
             return
@@ -56,7 +79,7 @@ class ChromaStore:
 
         self.collection = self.client.get_collection(
             name=collection_name,
-            embedding_function=embedding_function,
+            embedding_function=chroma_embedding_fn,
         )
 
     def count(self) -> int:
@@ -86,32 +109,35 @@ class ChromaStore:
     def query(
         self, *, query: str, top_k: int, where: dict[str, Any] | None = None
     ) -> dict[str, Any]:
-        return self.collection.query(
-            query_texts=[query],
-            n_results=top_k,
-            where=where,
-            include=["documents", "metadatas", "distances"],
+        return cast(
+            dict[str, Any],
+            self.collection.query(
+                query_texts=[query],
+                n_results=top_k,
+                where=cast(Where | None, where),
+                include=["documents", "metadatas", "distances"],
+            ),
         )
 
     def get_chunk(self, *, chunk_id: str) -> ChunkRecord:
         result = self.collection.get(ids=[chunk_id], include=["documents", "metadatas"])
-        ids = result.get("ids") or []
+        ids = cast(list[str], result.get("ids") or [])
         if not ids:
             raise ChunkNotFoundError(f"chunk not found: {chunk_id}")
 
-        documents = result.get("documents") or []
-        metadatas = result.get("metadatas") or []
-        metadata = metadatas[0] if metadatas else {}
+        documents = cast(list[str], result.get("documents") or [])
+        metadatas = cast(list[Mapping[str, object]], result.get("metadatas") or [])
+        metadata: Mapping[str, object] = metadatas[0] if metadatas else cast(Metadata, {})
 
         return ChunkRecord(
-            id=str(ids[0]),
-            text=str(documents[0] if documents else ""),
+            id=ids[0],
+            text=documents[0] if documents else "",
             metadata=ChunkMetadata(
                 doc_id=str(metadata.get("doc_id", "")),
                 source=str(metadata.get("source", "")),
                 title=str(metadata.get("title", "")),
-                page=int(metadata.get("page", 0)),
-                section=metadata.get("section"),
+                page=_as_int(metadata.get("page"), default=0),
+                section=_as_optional_str(metadata.get("section")),
             ),
         )
 

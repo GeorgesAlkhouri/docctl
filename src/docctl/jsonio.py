@@ -8,7 +8,7 @@ from typing import Any
 
 
 def _to_serializable(value: Any) -> Any:
-    if is_dataclass(value):
+    if is_dataclass(value) and not isinstance(value, type):
         return asdict(value)
     if isinstance(value, list):
         return [_to_serializable(item) for item in value]

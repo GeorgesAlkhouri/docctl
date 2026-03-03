@@ -1,12 +1,14 @@
 SHELL := /bin/zsh
 UV ?= uv
 
-.PHONY: sync test lint security-lint format format-check check-markdown-links help
+.PHONY: sync test lint typecheck typecheck-changed security-lint format format-check check-markdown-links help
 
 help:
 	@echo "Targets:"
 	@echo "  make sync  - install/update dependencies via uv"
 	@echo "  make lint  - run ruff lint checks"
+	@echo "  make typecheck - run mypy on src"
+	@echo "  make typecheck-changed - run mypy on changed src modules"
 	@echo "  make security-lint - run bandit security checks on src"
 	@echo "  make format - apply ruff formatter"
 	@echo "  make format-check - verify ruff formatting"
@@ -19,6 +21,12 @@ sync:
 
 lint:
 	$(UV) run ruff check src tests
+
+typecheck:
+	$(UV) run mypy src
+
+typecheck-changed:
+	@./scripts/typecheck-changed.sh
 
 security-lint:
 	$(UV) run bandit -q -r src
