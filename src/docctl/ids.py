@@ -26,11 +26,11 @@ def file_sha256(path: Path) -> str:
 
 def build_doc_id(source: str) -> str:
     normalized = source.replace("\\", "/")
-    digest = hashlib.sha1(normalized.encode("utf-8")).hexdigest()[:10]
+    digest = hashlib.sha1(normalized.encode("utf-8"), usedforsecurity=False).hexdigest()[:10]
     stem = Path(normalized).stem
     return f"{slugify(stem)}-{digest}"
 
 
 def build_chunk_id(doc_id: str, page: int, chunk_index: int, text: str) -> str:
-    digest = hashlib.sha1(text.encode("utf-8")).hexdigest()[:8]
+    digest = hashlib.sha1(text.encode("utf-8"), usedforsecurity=False).hexdigest()[:8]
     return f"{doc_id}:p{page:04d}:c{chunk_index:04d}:{digest}"

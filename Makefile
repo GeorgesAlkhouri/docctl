@@ -1,12 +1,13 @@
 SHELL := /bin/zsh
 UV ?= uv
 
-.PHONY: sync test lint format format-check check-markdown-links help
+.PHONY: sync test lint security-lint format format-check check-markdown-links help
 
 help:
 	@echo "Targets:"
 	@echo "  make sync  - install/update dependencies via uv"
 	@echo "  make lint  - run ruff lint checks"
+	@echo "  make security-lint - run bandit security checks on src"
 	@echo "  make format - apply ruff formatter"
 	@echo "  make format-check - verify ruff formatting"
 	@echo "  make test  - run unit, integration and acceptance tests"
@@ -18,6 +19,9 @@ sync:
 
 lint:
 	$(UV) run ruff check src tests
+
+security-lint:
+	$(UV) run bandit -q -r src
 
 format:
 	$(UV) run ruff check src tests --fix
