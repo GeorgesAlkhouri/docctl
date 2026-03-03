@@ -32,18 +32,19 @@ The tools below are proposed next additions, not yet mandatory.
 
 | tool | category | proposal | reason for agentic workflows |
 |---|---|---|---|
-| mypy | static typing | phase 2 | catches contract drift and `None`/type mismatches early |
-| Bandit | security static analysis | phase 2 | flags risky API patterns before review |
-| import-linter | architecture boundary linting | phase 3 | enforces dependency direction in `ARCHITECTURE.md` mechanically |
+| mypy | static typing | implemented | catches contract drift and `None`/type mismatches early |
+| Bandit | security static analysis | implemented | flags risky API patterns before review |
+| import-linter | architecture boundary linting | implemented | enforces dependency direction in `ARCHITECTURE.md` mechanically |
 
 ## Adoption Guidance
 1. Keep Ruff checks blocking in CI and local loops.
-2. Introduce `mypy` module-by-module with explicit strictness boundaries.
-3. Add Bandit with an explicit baseline/allowlist policy for noisy rules.
-4. Add import-linter contracts after current module topology is encoded.
+2. Keep `mypy` non-strict initially and ratchet strictness by module.
+3. Keep Bandit blocking and document any future allowlist rationale inline.
+4. Keep import-linter contracts synchronized with `ARCHITECTURE.md`.
 
 ## Acceptance Check for This Decision
 The policy is successful when:
 1. `make lint` passes on `src/` and `tests/`.
 2. `make format-check` passes on `src/` and `tests/`.
-3. Markdown docs and links remain valid via `make check-markdown-links`.
+3. `make typecheck`, `make security-lint`, and `make import-lint` pass on `src/`.
+4. Markdown docs and links remain valid via `make check-markdown-links`.

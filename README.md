@@ -60,7 +60,9 @@ uv run pytest tests/unit tests/integration tests/acceptance -q
 ## Lint And Format
 ```bash
 make lint
+make typecheck
 make security-lint
+make import-lint
 make format-check
 ```
 

@@ -1,0 +1,41 @@
+[importlinter]
+root_package = docctl
+include_external_packages = False
+
+[importlinter:contract:helpers-is-foundational]
+name = Helper modules are foundational
+type = forbidden
+source_modules =
+    docctl.config
+    docctl.errors
+    docctl.ids
+    docctl.jsonio
+    docctl.models
+    docctl.text_sanitize
+forbidden_modules =
+    docctl.chunking
+    docctl.cli
+    docctl.embeddings
+    docctl.index_store
+    docctl.pdf_extract
+    docctl.services
+
+[importlinter:contract:capability-not-orchestration]
+name = Capability modules do not depend on orchestration
+type = forbidden
+source_modules =
+    docctl.chunking
+    docctl.embeddings
+    docctl.index_store
+    docctl.pdf_extract
+forbidden_modules =
+    docctl.cli
+    docctl.services
+
+[importlinter:contract:services-do-not-import-cli]
+name = Services do not import CLI
+type = forbidden
+source_modules =
+    docctl.services
+forbidden_modules =
+    docctl.cli

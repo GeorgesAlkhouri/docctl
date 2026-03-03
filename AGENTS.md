@@ -26,9 +26,14 @@ This repository is agent-first and documentation-indexed for `docctl`.
 - Use authoritative, professional sources (official vendor documentation,
   standards bodies, primary project documentation, and reputable security or
   operations references), and avoid relying on informal or unverified sources.
+- When behavior, tooling, or validation workflow changes, update the relevant
+  repository config in the same change set (`pyproject.toml`, `Makefile`,
+  `.importlinter`, or equivalent tool config files).
 
 ## Housekeeping Rules
 - Any new or changed document MUST update the corresponding index file in the same change set.
+- Any change that introduces or alters tooling behavior MUST update the
+  corresponding config file(s) in the same change set.
 - Internal markdown links MUST pass `make check-markdown-links` before completion.
 - Broken, stale, or contradictory docs are defects and MUST be corrected in follow-up work.
 

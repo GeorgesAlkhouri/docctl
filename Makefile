@@ -1,7 +1,7 @@
 SHELL := /bin/zsh
 UV ?= uv
 
-.PHONY: sync test lint typecheck typecheck-changed security-lint format format-check check-markdown-links help
+.PHONY: sync test lint typecheck typecheck-changed security-lint import-lint format format-check check-markdown-links help
 
 help:
 	@echo "Targets:"
@@ -10,6 +10,7 @@ help:
 	@echo "  make typecheck - run mypy on src"
 	@echo "  make typecheck-changed - run mypy on changed src modules"
 	@echo "  make security-lint - run bandit security checks on src"
+	@echo "  make import-lint - run import-linter architecture contracts"
 	@echo "  make format - apply ruff formatter"
 	@echo "  make format-check - verify ruff formatting"
 	@echo "  make test  - run unit, integration and acceptance tests"
@@ -30,6 +31,9 @@ typecheck-changed:
 
 security-lint:
 	$(UV) run bandit -q -r src
+
+import-lint:
+	$(UV) run lint-imports
 
 format:
 	$(UV) run ruff check src tests --fix
