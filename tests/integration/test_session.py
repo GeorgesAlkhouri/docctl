@@ -119,3 +119,75 @@ def test_session_reuses_embedding_model_for_multiple_searches(
 
     # One for ingest + one for all session search requests.
     assert create_calls["count"] == 2
+
+
+def test_session_search_supports_title_filter(
+    runner, make_pdf, patch_fake_embeddings, tmp_path: Path
+) -> None:
+    alpha_pdf = make_pdf(
+        tmp_path / "alpha-manual.pdf",
+        ["Shared diagnostics retrieval phrase for alpha."],
+    )
+    beta_pdf = make_pdf(
+        tmp_path / "beta-manual.pdf",
+        ["Shared diagnostics retrieval phrase for beta."],
+    )
+    index_path = tmp_path / "index"
+
+    for pdf_path in (alpha_pdf, beta_pdf):
+        ingest_result = runner.invoke(
+            app,
+            [
+                "--index-path",
+                str(index_path),
+                "--collection",
+                "test",
+                "--json",
+                "ingest",
+                str(pdf_path),
+            ],
+        )
+        assert ingest_result.exit_code == 0, ingest_result.output
+
+    request_lines = json.dumps(
+        {
+            "id": "q1",
+            "op": "search",
+            "query": "shared diagnostics retrieval",
+            "top_k": 10,
+            "title": "alpha-manual",
+        }
+    )
+    session_result = runner.invoke(
+        app,
+        ["--index-path", str(index_path), "--collection", "test", "session"],
+        input=f"{request_lines}\n",
+    )
+    assert session_result.exit_code == 0, session_result.output
+
+    responses = [json.loads(line) for line in session_result.output.splitlines() if line.strip()]
+    assert len(responses) == 1
+    assert responses[0]["id"] == "q1"
+    assert responses[0]["ok"] is True
+    hits = responses[0]["result"]["hits"]
+    assert len(hits) >= 1
+    assert all(hit["metadata"]["title"] == "alpha-manual" for hit in hits)
+
+
+def test_session_search_rejects_non_string_title(runner, tmp_path: Path) -> None:
+    index_path = tmp_path / "index"
+    request_lines = json.dumps({"id": "q1", "op": "search", "query": "any query", "title": 123})
+
+    session_result = runner.invoke(
+        app,
+        ["--index-path", str(index_path), "--collection", "test", "session"],
+        input=f"{request_lines}\n",
+    )
+    assert session_result.exit_code == 0, session_result.output
+
+    responses = [json.loads(line) for line in session_result.output.splitlines() if line.strip()]
+    assert len(responses) == 1
+    assert responses[0]["id"] == "q1"
+    assert responses[0]["ok"] is False
+    assert responses[0]["error"]["exit_code"] == 50
+    assert responses[0]["error"]["message"] == "invalid session request field 'title'"

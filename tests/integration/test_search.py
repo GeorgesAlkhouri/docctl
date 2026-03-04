@@ -62,3 +62,84 @@ def test_search_json_contract_with_metadata(
     hit = payload["hits"][0]
     assert {"id", "text", "metadata", "distance", "score", "rank"}.issubset(hit.keys())
     assert {"doc_id", "source", "title", "page"}.issubset(hit["metadata"].keys())
+
+
+def test_search_supports_title_filter_and_combined_page_filter(
+    runner, make_pdf, patch_fake_embeddings, tmp_path: Path
+) -> None:
+    alpha_pdf = make_pdf(
+        tmp_path / "alpha-manual.pdf",
+        [
+            "Shared retrieval phrase for alpha page one.",
+            "Shared retrieval phrase for alpha page two.",
+        ],
+    )
+    beta_pdf = make_pdf(
+        tmp_path / "beta-manual.pdf",
+        [
+            "Shared retrieval phrase for beta page one.",
+        ],
+    )
+    index_path = tmp_path / "index"
+
+    for pdf_path in (alpha_pdf, beta_pdf):
+        ingest_result = runner.invoke(
+            app,
+            [
+                "--index-path",
+                str(index_path),
+                "--collection",
+                "test",
+                "--json",
+                "ingest",
+                str(pdf_path),
+            ],
+        )
+        assert ingest_result.exit_code == 0, ingest_result.output
+
+    title_filtered = runner.invoke(
+        app,
+        [
+            "--index-path",
+            str(index_path),
+            "--collection",
+            "test",
+            "--json",
+            "search",
+            "shared retrieval phrase",
+            "--top-k",
+            "10",
+            "--title",
+            "alpha-manual",
+        ],
+    )
+    assert title_filtered.exit_code == 0, title_filtered.output
+    title_payload = _json(title_filtered.output)
+
+    assert len(title_payload["hits"]) >= 1
+    assert all(hit["metadata"]["title"] == "alpha-manual" for hit in title_payload["hits"])
+
+    combined_filtered = runner.invoke(
+        app,
+        [
+            "--index-path",
+            str(index_path),
+            "--collection",
+            "test",
+            "--json",
+            "search",
+            "shared retrieval phrase",
+            "--top-k",
+            "10",
+            "--title",
+            "alpha-manual",
+            "--page",
+            "2",
+        ],
+    )
+    assert combined_filtered.exit_code == 0, combined_filtered.output
+    combined_payload = _json(combined_filtered.output)
+
+    assert len(combined_payload["hits"]) >= 1
+    assert all(hit["metadata"]["title"] == "alpha-manual" for hit in combined_payload["hits"])
+    assert all(hit["metadata"]["page"] == 2 for hit in combined_payload["hits"])

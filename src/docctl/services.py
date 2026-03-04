@@ -107,13 +107,15 @@ def _require_write_approval(*, config: CliConfig, approve_write: bool) -> None:
 
 
 def _build_where_filter(
-    *, doc_id: str | None, source: str | None, page: int | None
+    *, doc_id: str | None, source: str | None, title: str | None, page: int | None
 ) -> dict[str, Any] | None:
     conditions: list[dict[str, Any]] = []
     if doc_id:
         conditions.append({"doc_id": doc_id})
     if source:
         conditions.append({"source": source})
+    if title:
+        conditions.append({"title": title})
     if page:
         conditions.append({"page": int(page)})
 
@@ -306,6 +308,7 @@ def search_chunks(
     top_k: int,
     doc_id: str | None,
     source: str | None,
+    title: str | None,
     page: int | None,
     min_score: float | None,
     allow_model_download: bool,
@@ -318,6 +321,7 @@ def search_chunks(
         top_k: Maximum number of hits to return.
         doc_id: Optional document id filter.
         source: Optional source path filter.
+        title: Optional document title filter.
         page: Optional one-based page filter.
         min_score: Optional minimum similarity score in [0.0, 1.0].
         allow_model_download: Whether missing embedding models may be downloaded.
@@ -344,7 +348,7 @@ def search_chunks(
     if store.count() == 0:
         raise EmptyIndexSearchError("search cannot run on an empty index")
 
-    where = _build_where_filter(doc_id=doc_id, source=source, page=page)
+    where = _build_where_filter(doc_id=doc_id, source=source, title=title, page=page)
     result = store.query(query=query, top_k=top_k, where=where)
     hits = _search_hits_from_result(result=result, min_score=min_score)
 
@@ -462,6 +466,7 @@ class _SessionRuntime:
         top_k: int,
         doc_id: str | None,
         source: str | None,
+        title: str | None,
         page: int | None,
         min_score: float | None,
     ) -> dict[str, object]:
@@ -469,7 +474,7 @@ class _SessionRuntime:
         store = self._get_search_store()
         if store.count() == 0:
             raise EmptyIndexSearchError("search cannot run on an empty index")
-        where = _build_where_filter(doc_id=doc_id, source=source, page=page)
+        where = _build_where_filter(doc_id=doc_id, source=source, title=title, page=page)
         result = store.query(query=query, top_k=top_k, where=where)
         hits = _search_hits_from_result(result=result, min_score=min_score)
         return {
@@ -606,6 +611,7 @@ def run_session_requests(
                         top_k=top_k_value,
                         doc_id=_to_optional_str(payload.get("doc_id"), field_name="doc_id"),
                         source=_to_optional_str(payload.get("source"), field_name="source"),
+                        title=_to_optional_str(payload.get("title"), field_name="title"),
                         page=_to_optional_int(payload.get("page"), field_name="page", minimum=1),
                         min_score=_to_optional_float(
                             payload.get("min_score"),

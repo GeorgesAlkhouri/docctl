@@ -175,6 +175,7 @@ def search(
     top_k: int = typer.Option(5, "--top-k", min=1, max=100, help="Maximum hits to return."),
     doc_id: str | None = typer.Option(None, "--doc-id", help="Filter by document id."),
     source: str | None = typer.Option(None, "--source", help="Filter by source path."),
+    title: str | None = typer.Option(None, "--title", help="Filter by document title."),
     page: int | None = typer.Option(None, "--page", min=1, help="Filter by page number."),
     min_score: float | None = typer.Option(
         None, "--min-score", min=0.0, max=1.0, help="Minimum score."
@@ -193,6 +194,7 @@ def search(
         top_k: Maximum number of hits to return.
         doc_id: Optional document id filter.
         source: Optional source path filter.
+        title: Optional document title filter.
         page: Optional page filter.
         min_score: Optional minimum score filter in [0.0, 1.0].
         allow_model_download: Whether missing embedding models may be downloaded.
@@ -206,6 +208,7 @@ def search(
                 top_k=top_k,
                 doc_id=doc_id,
                 source=source,
+                title=title,
                 page=page,
                 min_score=min_score,
                 allow_model_download=allow_model_download,

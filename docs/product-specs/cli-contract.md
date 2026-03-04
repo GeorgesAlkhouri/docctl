@@ -8,11 +8,21 @@
 - `docctl doctor`
 - `docctl session`
 
+## Search Filters
+- `docctl search` supports optional metadata filters:
+  - `--doc-id`
+  - `--source`
+  - `--title`
+  - `--page`
+- Multiple filters are combined using logical `AND`.
+- `title` matching uses exact string equality.
+
 ## Output Modes
 - Human-readable default output.
 - Deterministic JSON output with `--json`.
 - `docctl session` uses NDJSON request/response on stdin/stdout:
   - Request line format: `{"id":"q1","op":"search",...}`
+  - Search request accepts optional filter fields: `doc_id`, `source`, `title`, `page`.
   - Response line format: `{"id":"q1","ok":true,"result":{...}}`
   - Error response format: `{"id":"q1","ok":false,"error":{"message":"...","exit_code":NN}}`
 
