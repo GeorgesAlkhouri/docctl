@@ -19,6 +19,8 @@ _MULTIPLE_NEWLINES_RE = re.compile(r"\n{3,}")
 
 @dataclass(slots=True)
 class PageText:
+    """Represent normalized text extracted from one PDF page."""
+
     page: int
     text: str
 

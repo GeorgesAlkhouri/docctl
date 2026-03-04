@@ -14,6 +14,8 @@ ENV_EMBEDDING_MODEL = "DOCCTL_EMBEDDING_MODEL"
 
 @dataclass(slots=True)
 class CliConfig:
+    """Capture resolved CLI runtime configuration values."""
+
     index_path: Path = DEFAULT_INDEX_PATH
     collection: str = DEFAULT_COLLECTION
     json_output: bool = False

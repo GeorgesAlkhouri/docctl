@@ -102,6 +102,15 @@ def callback(
     ),
     verbose: bool = typer.Option(False, "--verbose", help="Enable verbose diagnostics."),
 ) -> None:
+    """Initialize shared CLI context before command execution.
+
+    Args:
+        ctx: Typer context used to store runtime config.
+        index_path: Base index directory path.
+        collection: Chroma collection name.
+        json_output: Whether machine-readable JSON output is enabled.
+        verbose: Whether verbose diagnostics should be emitted.
+    """
     embedding_model = os.getenv(ENV_EMBEDDING_MODEL, DEFAULT_EMBEDDING_MODEL)
     require_write_approval = os.getenv(ENV_REQUIRE_WRITE_APPROVAL, "0") == "1"
 
@@ -131,6 +140,17 @@ def ingest(
         help="Allow downloading missing embedding model artifacts.",
     ),
 ) -> None:
+    """Ingest one PDF file or directory into the local index.
+
+    Args:
+        ctx: Typer context containing resolved configuration.
+        path: Path to a PDF file or directory.
+        recursive: Whether directory traversal is recursive.
+        glob_pattern: Glob pattern used for PDF discovery.
+        force: Whether known documents should be reingested.
+        approve_write: Explicit write approval for mutating operations.
+        allow_model_download: Whether missing embedding models may be downloaded.
+    """
     config = ctx.obj
     try:
         with _machine_output_guard(enabled=config.json_output and not config.verbose):
@@ -165,6 +185,18 @@ def search(
         help="Allow downloading missing embedding model artifacts.",
     ),
 ) -> None:
+    """Search indexed chunks and emit ranked results.
+
+    Args:
+        ctx: Typer context containing resolved configuration.
+        query: Natural-language query text.
+        top_k: Maximum number of hits to return.
+        doc_id: Optional document id filter.
+        source: Optional source path filter.
+        page: Optional page filter.
+        min_score: Optional minimum score filter in [0.0, 1.0].
+        allow_model_download: Whether missing embedding models may be downloaded.
+    """
     config = ctx.obj
     try:
         with _machine_output_guard(enabled=config.json_output and not config.verbose):
@@ -193,6 +225,13 @@ def show(
         help="Allow downloading missing embedding model artifacts.",
     ),
 ) -> None:
+    """Show one indexed chunk by id.
+
+    Args:
+        ctx: Typer context containing resolved configuration.
+        chunk_id: Chunk identifier to retrieve.
+        allow_model_download: Whether missing embedding models may be downloaded.
+    """
     config = ctx.obj
     try:
         with _machine_output_guard(enabled=config.json_output and not config.verbose):
@@ -206,6 +245,11 @@ def show(
 
 @app.command(help="Show index statistics.")
 def stats(ctx: typer.Context) -> None:
+    """Show index statistics for the current configuration.
+
+    Args:
+        ctx: Typer context containing resolved configuration.
+    """
     config = ctx.obj
     try:
         with _machine_output_guard(enabled=config.json_output and not config.verbose):
@@ -224,6 +268,12 @@ def doctor(
         help="Allow downloading missing embedding model artifacts.",
     ),
 ) -> None:
+    """Run local diagnostics for index and embedding readiness.
+
+    Args:
+        ctx: Typer context containing resolved configuration.
+        allow_model_download: Whether missing embedding models may be downloaded.
+    """
     config = ctx.obj
     try:
         with _machine_output_guard(enabled=config.json_output and not config.verbose):
@@ -244,6 +294,12 @@ def session(
         help="Allow downloading missing embedding model artifacts.",
     ),
 ) -> None:
+    """Run a read-only NDJSON request session on standard streams.
+
+    Args:
+        ctx: Typer context containing resolved configuration.
+        allow_model_download: Whether missing embedding models may be downloaded.
+    """
     config = ctx.obj
     try:
         responses = run_session_requests(
@@ -258,6 +314,7 @@ def session(
 
 
 def main() -> None:
+    """Run the docctl CLI application entrypoint."""
     app()
 
 
