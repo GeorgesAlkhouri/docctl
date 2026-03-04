@@ -1,0 +1,68 @@
+name: CI Linters
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: lint-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint-and-static-analysis:
+    name: Lint and static analysis (Python 3.12)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install dependencies from lockfile
+        run: uv sync --frozen --dev
+
+      - name: Run Ruff lint checks
+        run: make SHELL=/bin/bash lint
+
+      - name: Run Ruff format checks
+        run: make SHELL=/bin/bash format-check
+
+      - name: Run mypy type checks
+        run: make SHELL=/bin/bash typecheck
+
+      - name: Run Bandit security checks
+        run: make SHELL=/bin/bash security-lint
+
+      - name: Run import-linter architecture checks
+        run: make SHELL=/bin/bash import-lint
+
+  markdown-link-check:
+    name: Markdown link checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Run lychee (official action)
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: --offline --no-progress --include-fragments -- ./**/*.md
+          fail: true
