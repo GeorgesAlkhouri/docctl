@@ -19,6 +19,7 @@ This repository is agent-first and documentation-indexed for `docctl`.
 - Planning and execution workflow: [docs/PLANS.md](docs/PLANS.md)
 - Reliability and security requirements: [docs/RELIABILITY.md](docs/RELIABILITY.md), [docs/SECURITY.md](docs/SECURITY.md)
 - Curated source references: [docs/references/index.md](docs/references/index.md)
+- Agent integration skill (session-first, full-lifecycle): [SKILL.md](SKILL.md)
 
 ## Agent-First Rules
 - Use progressive disclosure: index first, details second.

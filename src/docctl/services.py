@@ -14,6 +14,13 @@ from typing import Any, Iterable
 from chromadb.api.types import Documents, EmbeddingFunction
 
 from .chunking import chunk_document_pages
+from .coerce import (
+    parse_optional_float,
+    parse_optional_int,
+    parse_optional_str,
+    to_int,
+    to_non_negative_int,
+)
 from .config import CliConfig
 from .embeddings import create_embedding_function
 from .errors import (
@@ -139,6 +146,34 @@ def _chunk_record_to_dict(record: ChunkRecord) -> dict[str, Any]:
     }
 
 
+def _manifest_documents(manifest: dict[str, Any]) -> dict[str, Any]:
+    documents = manifest.get("documents", {})
+    if isinstance(documents, dict):
+        return documents
+    return {}
+
+
+def _catalog_documents(manifest_documents: dict[str, Any]) -> list[dict[str, Any]]:
+    documents: list[dict[str, Any]] = []
+    for doc_id, raw_details in sorted(manifest_documents.items()):
+        if not isinstance(raw_details, dict):
+            continue
+        pages = to_non_negative_int(raw_details.get("pages", 0))
+        chunks = to_non_negative_int(raw_details.get("chunks", 0))
+        documents.append(
+            {
+                "doc_id": str(doc_id),
+                "source": str(raw_details.get("source", "")),
+                "title": str(raw_details.get("title", "")),
+                "pages": pages,
+                "chunks": chunks,
+                "last_ingest_at": raw_details.get("last_ingest_at"),
+                "content_hash": str(raw_details.get("content_hash", "")),
+            }
+        )
+    return documents
+
+
 def _search_hits_from_result(
     *,
     result: dict[str, Any],
@@ -165,7 +200,7 @@ def _search_hits_from_result(
             doc_id=str(metadata_raw.get("doc_id", "")),
             source=str(metadata_raw.get("source", "")),
             title=str(metadata_raw.get("title", "")),
-            page=int(metadata_raw.get("page", 0)),
+            page=to_int(metadata_raw.get("page"), default=0),
             section=metadata_raw.get("section"),
         )
         hit = SearchHit(
@@ -408,7 +443,7 @@ def collect_stats(*, config: CliConfig) -> dict[str, object]:
     )
 
     manifest = _load_manifest(config.index_path)
-    documents = manifest.get("documents", {})
+    documents = _manifest_documents(manifest)
 
     return {
         "collection": config.collection,
@@ -417,6 +452,43 @@ def collect_stats(*, config: CliConfig) -> dict[str, object]:
         "embedding_model": manifest.get("embedding_model", config.embedding_model),
         "index_path": str(config.index_path),
         "last_ingest_at": manifest.get("last_ingest_at"),
+    }
+
+
+def collect_catalog(*, config: CliConfig) -> dict[str, object]:
+    """Collect index summary plus per-document catalog entries.
+
+    Args:
+        config: Resolved CLI configuration.
+
+    Returns:
+        Catalog payload containing summary stats and per-document manifest rows.
+    """
+    store = ChromaStore(
+        index_path=config.index_path,
+        collection_name=config.collection,
+        embedding_function=None,
+        create_collection=False,
+        embedding_model=config.embedding_model,
+    )
+
+    manifest = _load_manifest(config.index_path)
+    documents_map = _manifest_documents(manifest)
+    documents = _catalog_documents(documents_map)
+    pages_total = sum(document["pages"] for document in documents)
+    chunk_count = store.count()
+
+    return {
+        "collection": config.collection,
+        "embedding_model": manifest.get("embedding_model", config.embedding_model),
+        "index_path": str(config.index_path),
+        "summary": {
+            "document_count": len(documents),
+            "chunk_count": chunk_count,
+            "pages_total": pages_total,
+            "last_ingest_at": manifest.get("last_ingest_at"),
+        },
+        "documents": documents,
     }
 
 
@@ -493,7 +565,7 @@ class _SessionRuntime:
     def stats(self) -> dict[str, object]:
         """Execute a session stats operation."""
         manifest = _load_manifest(self._config.index_path)
-        documents = manifest.get("documents", {})
+        documents = _manifest_documents(manifest)
         store = self._get_readonly_store()
         return {
             "collection": self._config.collection,
@@ -504,43 +576,27 @@ class _SessionRuntime:
             "last_ingest_at": manifest.get("last_ingest_at"),
         }
 
+    def catalog(self) -> dict[str, object]:
+        """Execute a session catalog operation."""
+        manifest = _load_manifest(self._config.index_path)
+        documents = _catalog_documents(_manifest_documents(manifest))
+        return {
+            "collection": self._config.collection,
+            "embedding_model": manifest.get("embedding_model", self._config.embedding_model),
+            "index_path": str(self._config.index_path),
+            "summary": {
+                "document_count": len(documents),
+                "chunk_count": self._get_readonly_store().count(),
+                "pages_total": sum(document["pages"] for document in documents),
+                "last_ingest_at": manifest.get("last_ingest_at"),
+            },
+            "documents": documents,
+        }
+
     def doctor(self) -> dict[str, object]:
         """Execute a session doctor operation."""
         report = run_doctor(config=self._config, allow_model_download=self._allow_model_download)
         return asdict(report)
-
-
-def _to_optional_str(value: Any, *, field_name: str) -> str | None:
-    if value is None:
-        return None
-    if isinstance(value, str):
-        return value
-    raise DocctlError(message=f"invalid session request field '{field_name}'", exit_code=50)
-
-
-def _to_optional_int(value: Any, *, field_name: str, minimum: int | None = None) -> int | None:
-    if value is None:
-        return None
-    if not isinstance(value, int):
-        raise DocctlError(message=f"invalid session request field '{field_name}'", exit_code=50)
-    if minimum is not None and value < minimum:
-        raise DocctlError(message=f"invalid session request field '{field_name}'", exit_code=50)
-    return value
-
-
-def _to_optional_float(
-    value: Any, *, field_name: str, minimum: float | None = None, maximum: float | None = None
-) -> float | None:
-    if value is None:
-        return None
-    if not isinstance(value, (float, int)):
-        raise DocctlError(message=f"invalid session request field '{field_name}'", exit_code=50)
-    parsed = float(value)
-    if minimum is not None and parsed < minimum:
-        raise DocctlError(message=f"invalid session request field '{field_name}'", exit_code=50)
-    if maximum is not None and parsed > maximum:
-        raise DocctlError(message=f"invalid session request field '{field_name}'", exit_code=50)
-    return parsed
 
 
 def _session_error(*, request_id: Any, error: Exception) -> dict[str, Any]:
@@ -609,11 +665,11 @@ def run_session_requests(
                     result = runtime.search(
                         query=query,
                         top_k=top_k_value,
-                        doc_id=_to_optional_str(payload.get("doc_id"), field_name="doc_id"),
-                        source=_to_optional_str(payload.get("source"), field_name="source"),
-                        title=_to_optional_str(payload.get("title"), field_name="title"),
-                        page=_to_optional_int(payload.get("page"), field_name="page", minimum=1),
-                        min_score=_to_optional_float(
+                        doc_id=parse_optional_str(payload.get("doc_id"), field_name="doc_id"),
+                        source=parse_optional_str(payload.get("source"), field_name="source"),
+                        title=parse_optional_str(payload.get("title"), field_name="title"),
+                        page=parse_optional_int(payload.get("page"), field_name="page", minimum=1),
+                        min_score=parse_optional_float(
                             payload.get("min_score"),
                             field_name="min_score",
                             minimum=0.0,
@@ -629,6 +685,8 @@ def run_session_requests(
                     result = runtime.show(chunk_id=chunk_id)
                 elif op == "stats":
                     result = runtime.stats()
+                elif op == "catalog":
+                    result = runtime.catalog()
                 elif op == "doctor":
                     result = runtime.doctor()
                 else:

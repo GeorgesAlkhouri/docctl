@@ -191,3 +191,44 @@ def test_session_search_rejects_non_string_title(runner, tmp_path: Path) -> None
     assert responses[0]["ok"] is False
     assert responses[0]["error"]["exit_code"] == 50
     assert responses[0]["error"]["message"] == "invalid session request field 'title'"
+
+
+def test_session_catalog_operation(runner, make_pdf, patch_fake_embeddings, tmp_path: Path) -> None:
+    pdf_path = make_pdf(
+        tmp_path / "catalog-doc.pdf",
+        ["Catalog check sentence one.", "Catalog check sentence two."],
+    )
+    index_path = tmp_path / "index"
+
+    ingest_result = runner.invoke(
+        app,
+        [
+            "--index-path",
+            str(index_path),
+            "--collection",
+            "test",
+            "--json",
+            "ingest",
+            str(pdf_path),
+        ],
+    )
+    assert ingest_result.exit_code == 0, ingest_result.output
+
+    session_result = runner.invoke(
+        app,
+        ["--index-path", str(index_path), "--collection", "test", "session"],
+        input='{"id":"q1","op":"catalog"}\n',
+    )
+    assert session_result.exit_code == 0, session_result.output
+
+    responses = [json.loads(line) for line in session_result.output.splitlines() if line.strip()]
+    assert len(responses) == 1
+    assert responses[0]["id"] == "q1"
+    assert responses[0]["ok"] is True
+
+    result = responses[0]["result"]
+    assert result["collection"] == "test"
+    assert result["summary"]["document_count"] == 1
+    assert result["summary"]["chunk_count"] >= 1
+    assert result["summary"]["pages_total"] == 2
+    assert len(result["documents"]) == 1

@@ -24,6 +24,7 @@ from .errors import DocctlError, EmbeddingConfigError, InternalDocctlError
 from .jsonio import dumps_json
 from .models import DoctorReport
 from .services import (
+    collect_catalog,
     collect_stats,
     ingest_path,
     run_doctor,
@@ -257,6 +258,22 @@ def stats(ctx: typer.Context) -> None:
     try:
         with _machine_output_guard(enabled=config.json_output and not config.verbose):
             payload = collect_stats(config=config)
+        _emit_success(config=config, payload=payload)
+    except Exception as error:  # noqa: BLE001
+        _handle_error(error)
+
+
+@app.command(help="Show index catalog with summary and per-document inventory.")
+def catalog(ctx: typer.Context) -> None:
+    """Show catalog view for the current index configuration.
+
+    Args:
+        ctx: Typer context containing resolved configuration.
+    """
+    config = ctx.obj
+    try:
+        with _machine_output_guard(enabled=config.json_output and not config.verbose):
+            payload = collect_catalog(config=config)
         _emit_success(config=config, payload=payload)
     except Exception as error:  # noqa: BLE001
         _handle_error(error)

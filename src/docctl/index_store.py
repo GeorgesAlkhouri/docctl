@@ -9,29 +9,9 @@ from typing import Any, cast
 import chromadb
 from chromadb.api.types import Documents, Embeddable, EmbeddingFunction, Metadata, Where
 
+from .coerce import to_int, to_optional_str
 from .errors import ChunkNotFoundError, IndexNotInitializedError
 from .models import ChunkMetadata, ChunkRecord
-
-
-def _as_int(value: object, *, default: int = 0) -> int:
-    if isinstance(value, bool):
-        return int(value)
-    if isinstance(value, int):
-        return value
-    if isinstance(value, float):
-        return int(value)
-    if isinstance(value, str):
-        try:
-            return int(value)
-        except ValueError:
-            return default
-    return default
-
-
-def _as_optional_str(value: object) -> str | None:
-    if isinstance(value, str):
-        return value
-    return None
 
 
 class ChromaStore:
@@ -168,8 +148,8 @@ class ChromaStore:
                 doc_id=str(metadata.get("doc_id", "")),
                 source=str(metadata.get("source", "")),
                 title=str(metadata.get("title", "")),
-                page=_as_int(metadata.get("page"), default=0),
-                section=_as_optional_str(metadata.get("section")),
+                page=to_int(metadata.get("page"), default=0),
+                section=to_optional_str(metadata.get("section")),
             ),
         )
 

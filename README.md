@@ -28,6 +28,7 @@ Main commands:
 - `docctl search <query>`
 - `docctl show <chunk_id>`
 - `docctl stats`
+- `docctl catalog`
 - `docctl doctor`
 - `docctl session` (read-only NDJSON batch/session mode)
 
@@ -48,9 +49,16 @@ uv run docctl --json show <chunk_id>
 ```bash
 cat <<'EOF' | uv run docctl --index-path ./.docctl --collection default session
 {"id":"q1","op":"search","query":"security gateway diagnostics","top_k":5}
-{"id":"q2","op":"stats"}
+{"id":"q2","op":"catalog"}
 EOF
 ```
+
+## Agent Skill
+For agent implementers, this repository provides a Codex-native skill:
+- [SKILL.md](SKILL.md)
+
+The skill defines a session-first retrieval workflow and full-lifecycle policy
+(bootstrap ingest when index is missing/empty, then retrieve with provenance).
 
 ## Tests
 ```bash

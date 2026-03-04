@@ -43,6 +43,59 @@ def test_stats_json_output(runner, make_pdf, patch_fake_embeddings, tmp_path: Pa
     assert "last_ingest_at" in payload
 
 
+def test_catalog_json_output(runner, make_pdf, patch_fake_embeddings, tmp_path: Path) -> None:
+    alpha_pdf = make_pdf(
+        tmp_path / "alpha-manual.pdf",
+        ["Shared phrase one.", "Shared phrase two."],
+    )
+    beta_pdf = make_pdf(
+        tmp_path / "beta-manual.pdf",
+        ["Another phrase one."],
+    )
+    index_path = tmp_path / "index"
+
+    for pdf_path in (alpha_pdf, beta_pdf):
+        ingest_result = runner.invoke(
+            app,
+            [
+                "--index-path",
+                str(index_path),
+                "--collection",
+                "test",
+                "--json",
+                "ingest",
+                str(pdf_path),
+            ],
+        )
+        assert ingest_result.exit_code == 0, ingest_result.output
+
+    catalog_result = runner.invoke(
+        app,
+        ["--index-path", str(index_path), "--collection", "test", "--json", "catalog"],
+    )
+
+    assert catalog_result.exit_code == 0, catalog_result.output
+    payload = _json(catalog_result.output)
+
+    assert payload["collection"] == "test"
+    assert payload["summary"]["document_count"] == 2
+    assert payload["summary"]["chunk_count"] >= 2
+    assert payload["summary"]["pages_total"] == 3
+    assert "last_ingest_at" in payload["summary"]
+    assert len(payload["documents"]) == 2
+
+    first_document = payload["documents"][0]
+    assert {
+        "doc_id",
+        "source",
+        "title",
+        "pages",
+        "chunks",
+        "last_ingest_at",
+        "content_hash",
+    }.issubset(first_document.keys())
+
+
 def test_doctor_json_output(runner, make_pdf, patch_fake_embeddings, tmp_path: Path) -> None:
     pdf_path = make_pdf(tmp_path / "doctor.pdf", ["Doctor check sample text for query."])
     index_path = tmp_path / "index"
