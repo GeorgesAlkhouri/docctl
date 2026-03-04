@@ -11,6 +11,7 @@ Curated authoritative sources used for implementation and operations decisions.
 | REF-0005 | mypy Documentation | primary project documentation | active | proposed static typing checks |
 | REF-0006 | Bandit Documentation | primary project documentation | active | proposed security linting checks |
 | REF-0007 | import-linter Documentation | primary project documentation | active | proposed architecture boundary checks |
+| REF-0008 | Google Python Style Guide (Docstrings) | primary project documentation | active | Google-style docstring structure and quality guidance |
 
 ## Source Quality Rule
 Use authoritative, professional sources (official vendor documentation,

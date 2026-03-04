@@ -53,3 +53,16 @@ This repository is agent-first and documentation-indexed for `docctl`.
 - Python test framework in this repository is `pytest`.
 - All programming artifacts MUST be in English: identifiers, modules, classes,
   functions, comments, log/error messages, CLI flags, and JSON keys.
+
+### Docstring Quality Policy
+- Public Python modules, classes, functions, and methods MUST include
+  Google-style docstrings that describe intent and usage, not line-by-line
+  implementation details.
+- Docstrings MUST include sections that are appropriate to the callable (for
+  example: `Args`, `Returns`, `Raises`, `Yields`) and MUST keep type
+  information consistent with the function signature.
+- Docstrings SHOULD document side effects, important invariants, and notable
+  error conditions so agent and human operators can safely compose behavior.
+- Follow the repository guidance in
+  [docs/references/google-python-style-docstrings.md](docs/references/google-python-style-docstrings.md)
+  when writing or revising docstrings.
