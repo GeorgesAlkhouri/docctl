@@ -17,18 +17,19 @@ def to_int(value: object, *, default: int = 0) -> int:
     Returns:
         Parsed integer or `default` when the value cannot be interpreted as int.
     """
+    parsed = default
     if isinstance(value, bool):
-        return int(value)
-    if isinstance(value, int):
-        return value
-    if isinstance(value, float):
-        return int(value)
-    if isinstance(value, str):
+        parsed = int(value)
+    elif isinstance(value, int):
+        parsed = value
+    elif isinstance(value, float):
+        parsed = int(value)
+    elif isinstance(value, str):
         try:
-            return int(value)
+            parsed = int(value)
         except ValueError:
-            return default
-    return default
+            parsed = default
+    return parsed
 
 
 def to_non_negative_int(value: object) -> int:

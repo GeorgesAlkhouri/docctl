@@ -39,7 +39,42 @@ line-length = 100
 src = ["src", "tests"]
 
 [tool.ruff.lint]
-select = ["E4", "E7", "E9", "F", "I"]
+select = [
+  "E4",
+  "E7",
+  "E9",
+  "F",
+  "I",
+  "B",
+  "C90",
+  "RET",
+  "SIM",
+  "ARG",
+  "PLR0911",
+  "PLR0912",
+  "PLR0913",
+  "PLR0915",
+]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["typer.Argument", "typer.Option"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 8
+
+[tool.ruff.lint.pylint]
+max-args = 5
+max-positional-args = 4
+max-branches = 10
+max-locals = 12
+max-public-methods = 12
+max-returns = 5
+max-statements = 35
+max-nested-blocks = 4
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["ARG", "PLR0913", "PLR0915"]
+"src/docctl/cli.py" = ["PLR0913"]
 
 [tool.ruff.format]
 docstring-code-format = true

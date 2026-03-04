@@ -18,6 +18,12 @@ forbidden_modules =
     docctl.embeddings
     docctl.index_store
     docctl.pdf_extract
+    docctl.service_doctor
+    docctl.service_ingest
+    docctl.service_manifest
+    docctl.service_query
+    docctl.service_session
+    docctl.service_types
     docctl.services
 
 [importlinter:contract:capability-not-orchestration]
@@ -30,12 +36,24 @@ source_modules =
     docctl.pdf_extract
 forbidden_modules =
     docctl.cli
+    docctl.service_doctor
+    docctl.service_ingest
+    docctl.service_manifest
+    docctl.service_query
+    docctl.service_session
+    docctl.service_types
     docctl.services
 
 [importlinter:contract:services-do-not-import-cli]
 name = Services do not import CLI
 type = forbidden
 source_modules =
+    docctl.service_doctor
+    docctl.service_ingest
+    docctl.service_manifest
+    docctl.service_query
+    docctl.service_session
+    docctl.service_types
     docctl.services
 forbidden_modules =
     docctl.cli

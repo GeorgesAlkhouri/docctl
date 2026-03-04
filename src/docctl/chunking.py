@@ -12,7 +12,7 @@ from .models import ChunkMetadata, ChunkRecord
 from .pdf_extract import PageText
 
 
-def chunk_document_pages(
+def chunk_document_pages(  # noqa: PLR0913 - explicit parameters keep the chunking API clear; wrapping into a config object here would add indirection without reducing complexity.
     *,
     doc_id: str,
     source: str,

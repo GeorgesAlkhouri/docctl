@@ -15,7 +15,15 @@ Primary runtime code lives in `src/docctl/`.
   - User entrypoint and command contract.
   - Responsible for argument parsing, output mode selection, and exit behavior.
 - `services.py`
-  - Orchestration layer for command workflows (`ingest`, `search`, `show`, `stats`, `doctor`).
+  - Stable façade entrypoint consumed by `cli.py`.
+  - Preserves service-level public call signatures and monkeypatch seams.
+- `service_ingest.py`, `service_query.py`, `service_session.py`, `service_doctor.py`
+  - Internal orchestration modules split by workflow domain.
+  - Own command execution logic for ingest/query/session/doctor flows.
+- `service_manifest.py`
+  - Manifest and catalog serialization helpers.
+- `service_types.py`
+  - Internal dataclasses/protocols for service request payloads and injected dependencies.
 - `pdf_extract.py`
   - PDF text extraction and text-normalization pipeline.
 - `chunking.py`
@@ -31,8 +39,9 @@ Primary runtime code lives in `src/docctl/`.
 Required dependency direction:
 1. Helper modules (`models`, `errors`, `config`, `jsonio`, `ids`) are foundational.
 2. Capability modules (`pdf_extract`, `chunking`, `index_store`, `embeddings`) depend on helpers.
-3. `services` composes helpers and capability modules.
-4. `cli` depends on `services` and shared contracts only.
+3. Service orchestration modules (`service_*`) compose helpers and capability modules.
+4. `services` is a compatibility façade over `service_*` modules.
+5. `cli` depends on `services` and shared contracts only.
 
 Disallowed pattern examples:
 - Low-level modules importing CLI code.
