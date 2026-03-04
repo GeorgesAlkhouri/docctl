@@ -1,6 +1,6 @@
 ---
 name: "docctl-agent"
-description: "Use when an agent needs full-lifecycle PDF ingestion and provenance-grounded retrieval via docctl CLI/session, while keeping query rewriting and conversation strategy in the agent layer."
+description: "Agent skill for docctl PDF ingestion and provenance-grounded retrieval."
 ---
 
 # docctl Agent Skill
@@ -37,9 +37,9 @@ description: "Use when an agent needs full-lifecycle PDF ingestion and provenanc
 
 ## Operational workflow (ordered)
 1. Run readiness checks.
-   - Use `docctl doctor` to validate environment/index status.
-   - Use `docctl stats` to inspect chunk/document counts.
-   - Use `docctl catalog` when the user or agent asks for a full database overview.
+   - Default to `docctl catalog` for readiness and full index inventory.
+   - Run `docctl stats` only when quick aggregate counts are specifically needed.
+   - Run `docctl doctor` only when diagnostics are needed (for example command failures, config issues, or unexpected index behavior).
 2. Apply bootstrap ingest rules (full lifecycle).
    - If index is missing or empty, run `docctl ingest <path>`.
    - Reingest only on explicit user intent or stale corpus signals (file updates/new files).
@@ -53,6 +53,7 @@ description: "Use when an agent needs full-lifecycle PDF ingestion and provenanc
    - Increase `top_k` per policy and retry up to max attempts.
 6. Inspect top evidence chunks.
    - Call `show` for selected chunk IDs before synthesis when precision matters.
+   - Treat high-value returned sentences/snippets as a lead and inspect the full returned chunk before final synthesis to capture qualifiers and surrounding context.
 7. Synthesize answer with explicit citations.
    - Include provenance and state uncertainty when evidence is insufficient.
 
@@ -71,11 +72,13 @@ description: "Use when an agent needs full-lifecycle PDF ingestion and provenanc
 - `show`:
   - Use to inspect and quote exact chunk evidence by `chunk_id`.
 - `stats`:
-  - Use to check index/corpus readiness and avoid unnecessary ingest.
+  - Do not run by default in retrieval loops.
+  - Use when quick aggregate counts are needed.
 - `catalog`:
   - Use to inspect per-document inventory (`doc_id`, `source`, `title`, `pages`, `chunks`) with summary stats.
 - `doctor`:
-  - Use to diagnose environment/config failures before retrieval loops.
+  - Do not run by default in retrieval loops because it adds latency.
+  - Use only to diagnose environment/config failures or unexpected runtime behavior.
 
 ## Retrieval policy defaults
 - Attempt 1 (baseline):
