@@ -44,6 +44,19 @@ class LocalSentenceTransformerEmbedding(EmbeddingFunction[Documents]):
 def create_embedding_function(
     *, model_name: str, allow_download: bool, verbose: bool = False
 ) -> EmbeddingFunction[Documents]:
+    """Create the embedding function used for ingest and search operations.
+
+    Args:
+        model_name: SentenceTransformer model identifier.
+        allow_download: Whether missing model assets may be downloaded.
+        verbose: Whether verbose diagnostics are enabled.
+
+    Returns:
+        Embedding function compatible with Chroma query and upsert APIs.
+
+    Raises:
+        EmbeddingConfigError: If model loading fails or downloads are not allowed.
+    """
     return LocalSentenceTransformerEmbedding(
         model_name=model_name,
         allow_download=allow_download,

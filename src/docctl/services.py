@@ -189,6 +189,20 @@ def ingest_path(
     approve_write: bool,
     allow_model_download: bool,
 ) -> dict[str, object]:
+    """Ingest one PDF path or directory into the local vector index.
+
+    Args:
+        config: Resolved CLI configuration.
+        input_path: PDF file or directory to ingest.
+        recursive: Whether directory traversal is recursive.
+        glob_pattern: Glob used for PDF discovery in directories.
+        force: Whether existing documents should be reingested.
+        approve_write: Explicit user approval for mutating writes.
+        allow_model_download: Whether missing embedding models may be downloaded.
+
+    Returns:
+        Summary payload describing ingested, skipped, and failed documents.
+    """
     _require_write_approval(config=config, approve_write=approve_write)
 
     files = _discover_pdf_files(
@@ -296,6 +310,24 @@ def search_chunks(
     min_score: float | None,
     allow_model_download: bool,
 ) -> dict[str, object]:
+    """Search indexed chunks with optional metadata filters.
+
+    Args:
+        config: Resolved CLI configuration.
+        query: Natural-language query text.
+        top_k: Maximum number of hits to return.
+        doc_id: Optional document id filter.
+        source: Optional source path filter.
+        page: Optional one-based page filter.
+        min_score: Optional minimum similarity score in [0.0, 1.0].
+        allow_model_download: Whether missing embedding models may be downloaded.
+
+    Returns:
+        Search payload containing ranked hits and query metadata.
+
+    Raises:
+        EmptyIndexSearchError: If the target collection has zero chunks.
+    """
     embedding_fn = create_embedding_function(
         model_name=config.embedding_model,
         allow_download=allow_model_download,
@@ -328,6 +360,16 @@ def search_chunks(
 def show_chunk(
     *, config: CliConfig, chunk_id: str, allow_model_download: bool
 ) -> dict[str, object]:
+    """Return one indexed chunk by id.
+
+    Args:
+        config: Resolved CLI configuration.
+        chunk_id: Chunk identifier to retrieve.
+        allow_model_download: Unused compatibility flag for command parity.
+
+    Returns:
+        Serialized chunk record payload.
+    """
     _ = allow_model_download
     store = ChromaStore(
         index_path=config.index_path,
@@ -345,6 +387,14 @@ def show_chunk(
 
 
 def collect_stats(*, config: CliConfig) -> dict[str, object]:
+    """Collect collection-level statistics and manifest details.
+
+    Args:
+        config: Resolved CLI configuration.
+
+    Returns:
+        Stats payload with counts, paths, and ingest metadata.
+    """
     store = ChromaStore(
         index_path=config.index_path,
         collection_name=config.collection,
@@ -415,6 +465,7 @@ class _SessionRuntime:
         page: int | None,
         min_score: float | None,
     ) -> dict[str, object]:
+        """Execute a session search operation."""
         store = self._get_search_store()
         if store.count() == 0:
             raise EmptyIndexSearchError("search cannot run on an empty index")
@@ -430,10 +481,12 @@ class _SessionRuntime:
         }
 
     def show(self, *, chunk_id: str) -> dict[str, object]:
+        """Execute a session show operation."""
         record = self._get_readonly_store().get_chunk(chunk_id=chunk_id)
         return _chunk_record_to_dict(record)
 
     def stats(self) -> dict[str, object]:
+        """Execute a session stats operation."""
         manifest = _load_manifest(self._config.index_path)
         documents = manifest.get("documents", {})
         store = self._get_readonly_store()
@@ -447,6 +500,7 @@ class _SessionRuntime:
         }
 
     def doctor(self) -> dict[str, object]:
+        """Execute a session doctor operation."""
         report = run_doctor(config=self._config, allow_model_download=self._allow_model_download)
         return asdict(report)
 
@@ -505,6 +559,16 @@ def run_session_requests(
     request_lines: Iterable[str],
     allow_model_download: bool,
 ) -> Iterable[dict[str, Any]]:
+    """Process NDJSON session requests and yield response payloads.
+
+    Args:
+        config: Resolved CLI configuration.
+        request_lines: Incoming NDJSON request lines.
+        allow_model_download: Whether missing embedding models may be downloaded.
+
+    Yields:
+        Response dictionaries containing success results or structured errors.
+    """
     runtime = _SessionRuntime(config=config, allow_model_download=allow_model_download)
 
     for raw_line in request_lines:
@@ -574,6 +638,15 @@ def run_session_requests(
 
 
 def run_doctor(*, config: CliConfig, allow_model_download: bool) -> DoctorReport:
+    """Run repository-local health checks for index and embedding readiness.
+
+    Args:
+        config: Resolved CLI configuration.
+        allow_model_download: Whether missing embedding models may be downloaded.
+
+    Returns:
+        Structured doctor report with checks, warnings, and errors.
+    """
     checks: list[DoctorCheck] = []
     warnings: list[str] = []
     errors: list[str] = []

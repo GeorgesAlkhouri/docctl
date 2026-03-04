@@ -83,9 +83,15 @@ class ChromaStore:
         )
 
     def count(self) -> int:
+        """Return the number of chunks currently stored in the collection."""
         return int(self.collection.count())
 
     def upsert_chunks(self, records: list[ChunkRecord]) -> None:
+        """Insert or update chunk records in the backing Chroma collection.
+
+        Args:
+            records: Chunk records to persist.
+        """
         if not records:
             return
         self.collection.upsert(
@@ -104,11 +110,26 @@ class ChromaStore:
         )
 
     def delete_by_doc_id(self, doc_id: str) -> None:
+        """Delete all chunks belonging to one document id.
+
+        Args:
+            doc_id: Document identifier to delete.
+        """
         self.collection.delete(where={"doc_id": doc_id})
 
     def query(
         self, *, query: str, top_k: int, where: dict[str, Any] | None = None
     ) -> dict[str, Any]:
+        """Run a semantic query and return raw Chroma response payload.
+
+        Args:
+            query: Natural-language query text.
+            top_k: Maximum number of hits to return.
+            where: Optional metadata filter expression.
+
+        Returns:
+            Raw query result including ids, documents, metadata, and distances.
+        """
         return cast(
             dict[str, Any],
             self.collection.query(
@@ -120,6 +141,17 @@ class ChromaStore:
         )
 
     def get_chunk(self, *, chunk_id: str) -> ChunkRecord:
+        """Fetch one chunk record by id.
+
+        Args:
+            chunk_id: Chunk identifier to retrieve.
+
+        Returns:
+            Resolved chunk record including text and metadata.
+
+        Raises:
+            ChunkNotFoundError: If the chunk id does not exist in the collection.
+        """
         result = self.collection.get(ids=[chunk_id], include=["documents", "metadatas"])
         ids = cast(list[str], result.get("ids") or [])
         if not ids:
@@ -142,4 +174,5 @@ class ChromaStore:
         )
 
     def metadata(self) -> dict[str, Any]:
+        """Return collection metadata as a plain dictionary."""
         return dict(self.collection.metadata or {})

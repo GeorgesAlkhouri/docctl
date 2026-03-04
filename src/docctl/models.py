@@ -8,6 +8,8 @@ from typing import Any
 
 @dataclass(slots=True)
 class ChunkMetadata:
+    """Describe source metadata stored alongside each indexed chunk."""
+
     doc_id: str
     source: str
     title: str
@@ -17,6 +19,8 @@ class ChunkMetadata:
 
 @dataclass(slots=True)
 class SearchHit:
+    """Represent one ranked search result returned from vector lookup."""
+
     rank: int
     id: str
     text: str
@@ -27,6 +31,8 @@ class SearchHit:
 
 @dataclass(slots=True)
 class ChunkRecord:
+    """Store a chunk payload and its normalized metadata."""
+
     id: str
     text: str
     metadata: ChunkMetadata
@@ -34,6 +40,8 @@ class ChunkRecord:
 
 @dataclass(slots=True)
 class DoctorCheck:
+    """Capture one health-check outcome emitted by `docctl doctor`."""
+
     name: str
     ok: bool
     message: str
@@ -41,6 +49,8 @@ class DoctorCheck:
 
 @dataclass(slots=True)
 class DoctorReport:
+    """Aggregate all doctor checks, warnings, and errors for CLI output."""
+
     ok: bool
     checks: list[DoctorCheck]
     warnings: list[str]
