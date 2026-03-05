@@ -47,6 +47,8 @@ description: "Agent skill for docctl PDF ingestion and provenance-grounded retri
    - Rewrite/expand/paraphrase outside `docctl` if needed.
 4. Execute retrieval (session-first).
    - Primary: `docctl session` with `op:"search"` for iterative loops.
+   - For two or more read operations in one workflow, open one `docctl session` and send multiple NDJSON requests in that session.
+   - Do not run multiple sequential one-shot read commands via repeated tool calls when `session` is available.
    - Secondary fallback: one-shot `docctl search`.
 5. Run bounded evidence expansion loop.
    - If no or weak results, broaden query and/or relax filters.
@@ -64,9 +66,11 @@ description: "Agent skill for docctl PDF ingestion and provenance-grounded retri
   - Avoid repeated reingest unless needed.
 - `search`:
   - Use for one-shot retrieval.
+  - Do not chain multiple `search`/`show`/`stats`/`catalog` calls via separate tool invocations for the same workflow; switch to `session`.
   - Relevant options: `--doc-id`, `--source`, `--title`, `--page`, `--top-k`, `--min-score`.
 - `session`:
   - Use for iterative retrieval workflows.
+  - Preferred default for multi-step work: keep one session open and submit all read operations (`search`, `show`, `stats`, `catalog`, `doctor`) as NDJSON lines.
   - Supported operations: `search`, `show`, `stats`, `catalog`, `doctor`.
   - Search request accepts optional fields: `doc_id`, `source`, `title`, `page`, `top_k`, `min_score`.
 - `show`:
