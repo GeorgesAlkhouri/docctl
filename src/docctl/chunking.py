@@ -18,10 +18,24 @@ def chunk_document_pages(  # noqa: PLR0913 - explicit parameters keep the chunki
     source: str,
     title: str,
     pages: list[PageText],
-    chunk_size: int = 600,
-    chunk_overlap: int = 80,
+    chunk_size: int = 220,
+    chunk_overlap: int = 40,
 ) -> list[ChunkRecord]:
-    """Convert page-level text into sentence-aware chunks while preserving metadata."""
+    """Convert page text into sentence-aware chunks while preserving metadata.
+
+    Args:
+        doc_id: Stable identifier of the source document.
+        source: Source path or URI associated with the document.
+        title: Human-readable title associated with the document.
+        pages: Extracted page text objects.
+        chunk_size: Maximum target size for each chunk in characters.
+            Smaller values create more, shorter chunks.
+        chunk_overlap: Number of trailing characters repeated from one chunk
+            into the next chunk to preserve local context across boundaries.
+
+    Returns:
+        Deterministic chunk records with metadata and stable chunk identifiers.
+    """
     documents = [
         Document(
             text=page.text,

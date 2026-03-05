@@ -6,7 +6,7 @@ This directory contains a reproducible benchmark harness for comparing
 ## Scope
 - Public dataset: `google/xquad` (`xquad.en`, `xquad.de`)
 - Corpus construction: deduplicated contexts rendered as PDFs
-- Retrieval engine: `docctl ingest` + `docctl session` search
+- Retrieval engine: benchmark custom ingest (docctl internals with configurable chunking) + `docctl session` search
 - Primary evaluation split: hold-out `test` query split
 
 ## Models
@@ -18,6 +18,10 @@ From repository root:
 ```bash
 uv run --with datasets python benchmarks/embedding_eval/run_xquad_benchmark.py
 ```
+
+Default benchmark chunking:
+- `--chunk-size 220`
+- `--chunk-overlap 40`
 
 Common smoke run:
 
@@ -39,3 +43,4 @@ uv run --with datasets python benchmarks/embedding_eval/run_xquad_benchmark.py -
 - Deterministic train/validation/test split from sampled queries.
 - Isolated index per `(language, model)` under `.work/indexes/`.
 - Rebuilt index on every benchmark run.
+- Chunking is explicit and configurable (`--chunk-size`, `--chunk-overlap`) for stable comparisons.

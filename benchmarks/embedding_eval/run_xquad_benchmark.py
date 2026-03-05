@@ -64,6 +64,27 @@ class QuerySpec:
         }
 
 
+@dataclass(slots=True, frozen=True)
+class IngestConfig:
+    """Capture benchmark ingest settings."""
+
+    model_name: str
+    allow_model_download: bool
+    chunk_size: int
+    chunk_overlap: int
+
+
+@dataclass(slots=True, frozen=True)
+class IngestDependencies:
+    """Bundle lazy-loaded docctl ingest callables."""
+
+    chunk_document_pages: Any
+    create_embedding_function: Any
+    build_doc_id: Any
+    chroma_store_cls: Any
+    extract_pdf_pages: Any
+
+
 def parse_args() -> argparse.Namespace:
     """Parse benchmark CLI options."""
 
@@ -87,6 +108,18 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=10,
         help="Top-K used for docctl search requests.",
+    )
+    parser.add_argument(
+        "--chunk-size",
+        type=int,
+        default=220,
+        help="Benchmark ingest chunk size (smaller than docctl default to increase chunk granularity).",
+    )
+    parser.add_argument(
+        "--chunk-overlap",
+        type=int,
+        default=40,
+        help="Benchmark ingest chunk overlap.",
     )
     parser.add_argument(
         "--languages",
@@ -118,6 +151,12 @@ def parse_args() -> argparse.Namespace:
         raise SystemExit("--queries-per-lang must be positive")
     if not (1 <= args.top_k <= 100):
         raise SystemExit("--top-k must be in range [1, 100]")
+    if args.chunk_size <= 0:
+        raise SystemExit("--chunk-size must be positive")
+    if args.chunk_overlap < 0:
+        raise SystemExit("--chunk-overlap must be non-negative")
+    if args.chunk_overlap >= args.chunk_size:
+        raise SystemExit("--chunk-overlap must be smaller than --chunk-size")
 
     languages = [part.strip() for part in args.languages.split(",") if part.strip()]
     if not languages:
@@ -283,32 +322,6 @@ def split_queries(*, queries: list[QuerySpec], language: str, seed: int) -> dict
     }
 
 
-def run_subprocess(
-    *,
-    command: list[str],
-    env: dict[str, str],
-    cwd: Path = REPO_ROOT,
-) -> subprocess.CompletedProcess[str]:
-    """Run subprocess and raise clear failure details on non-zero exit."""
-
-    result = subprocess.run(
-        command,
-        cwd=cwd,
-        env=env,
-        check=False,
-        text=True,
-        capture_output=True,
-    )
-    if result.returncode != 0:
-        joined = " ".join(shlex.quote(part) for part in command)
-        raise RuntimeError(
-            f"Command failed ({result.returncode}): {joined}\n"
-            f"stdout:\n{result.stdout}\n"
-            f"stderr:\n{result.stderr}"
-        )
-    return result
-
-
 def load_xquad_split(*, config: str) -> Any:
     """Load one XQuAD split with explicit dependency error guidance."""
 
@@ -328,13 +341,128 @@ def load_xquad_split(*, config: str) -> Any:
     )
 
 
+def load_docctl_ingest_dependencies() -> IngestDependencies:
+    """Import benchmark ingest dependencies lazily from docctl internals."""
+
+    try:
+        from docctl.chunking import chunk_document_pages
+        from docctl.embeddings import create_embedding_function
+        from docctl.ids import build_doc_id
+        from docctl.index_store import ChromaStore
+        from docctl.pdf_extract import extract_pdf_pages
+    except ImportError as error:  # pragma: no cover - operator environment check
+        raise RuntimeError(
+            "Failed to import docctl modules for benchmark ingest. "
+            "Run from repository root with `uv run ...`."
+        ) from error
+
+    return IngestDependencies(
+        chunk_document_pages=chunk_document_pages,
+        create_embedding_function=create_embedding_function,
+        build_doc_id=build_doc_id,
+        chroma_store_cls=ChromaStore,
+        extract_pdf_pages=extract_pdf_pages,
+    )
+
+
+def ingest_one_pdf(
+    *,
+    pdf_path: Path,
+    store: Any,
+    dependencies: IngestDependencies,
+    config: IngestConfig,
+) -> tuple[int, int]:
+    """Ingest one PDF into an existing store and return page/chunk counts."""
+
+    source = str(pdf_path.resolve())
+    title = pdf_path.stem
+    doc_id = str(dependencies.build_doc_id(source))
+    pages = dependencies.extract_pdf_pages(pdf_path)
+    chunks = dependencies.chunk_document_pages(
+        doc_id=doc_id,
+        source=source,
+        title=title,
+        pages=pages,
+        chunk_size=config.chunk_size,
+        chunk_overlap=config.chunk_overlap,
+    )
+    if not chunks:
+        raise RuntimeError(f"No chunks produced for PDF: {pdf_path}")
+    store.delete_by_doc_id(doc_id)
+    store.upsert_chunks(chunks)
+    return len(pages), len(chunks)
+
+
+def ingest_corpus_with_custom_chunking(
+    *,
+    corpus_dir: Path,
+    index_path: Path,
+    config: IngestConfig,
+) -> dict[str, Any]:
+    """Build benchmark index using custom chunking parameters."""
+
+    dependencies = load_docctl_ingest_dependencies()
+    embedding_fn = dependencies.create_embedding_function(
+        model_name=config.model_name,
+        allow_download=config.allow_model_download,
+        verbose=False,
+    )
+    store = dependencies.chroma_store_cls(
+        index_path=index_path,
+        collection_name="default",
+        embedding_function=embedding_fn,
+        create_collection=True,
+        embedding_model=config.model_name,
+    )
+
+    pdf_files = sorted(corpus_dir.glob("*.pdf"))
+    if not pdf_files:
+        raise RuntimeError(f"No PDF files found in corpus directory: {corpus_dir}")
+
+    files_indexed = 0
+    pages_indexed = 0
+    chunks_indexed = 0
+    errors: list[dict[str, str]] = []
+    for pdf_path in pdf_files:
+        try:
+            pages_count, chunks_count = ingest_one_pdf(
+                pdf_path=pdf_path,
+                store=store,
+                dependencies=dependencies,
+                config=config,
+            )
+            files_indexed += 1
+            pages_indexed += pages_count
+            chunks_indexed += chunks_count
+        except Exception as error:  # noqa: BLE001
+            errors.append({"file": str(pdf_path), "error": str(error)})
+
+    if files_indexed <= 0:
+        first_error = errors[0]["error"] if errors else "unknown ingest failure"
+        raise RuntimeError(f"Custom benchmark ingest failed. First error: {first_error}")
+
+    return {
+        "collection": "default",
+        "embedding_model": config.model_name,
+        "files_discovered": len(pdf_files),
+        "files_indexed": files_indexed,
+        "files_skipped": 0,
+        "pages_indexed": pages_indexed,
+        "chunks_indexed": chunks_indexed,
+        "chunk_size": config.chunk_size,
+        "chunk_overlap": config.chunk_overlap,
+        "errors": errors,
+        "index_path": str(index_path),
+        "ingest_mode": "benchmark_custom_chunking",
+    }
+
+
 def run_ingest(
     *,
     language: str,
-    model_name: str,
     model_path_slug: str,
     work_dir: Path,
-    allow_model_download: bool,
+    config: IngestConfig,
 ) -> tuple[float, dict[str, Any], Path]:
     """Build isolated index for one language/model pair and return ingest metrics."""
 
@@ -344,32 +472,13 @@ def run_ingest(
     index_path.parent.mkdir(parents=True, exist_ok=True)
 
     corpus_dir = work_dir / "corpus" / language
-    command = [
-        "uv",
-        "run",
-        "docctl",
-        "--index-path",
-        str(index_path),
-        "--collection",
-        "default",
-        "--json",
-        "ingest",
-        str(corpus_dir),
-    ]
-    if allow_model_download:
-        command.append("--allow-model-download")
-
-    env = dict(os.environ)
-    env["DOCCTL_EMBEDDING_MODEL"] = model_name
-
     start = time.perf_counter()
-    result = run_subprocess(command=command, env=env, cwd=REPO_ROOT)
+    ingest_payload = ingest_corpus_with_custom_chunking(
+        corpus_dir=corpus_dir,
+        index_path=index_path,
+        config=config,
+    )
     ingest_seconds = time.perf_counter() - start
-
-    lines = [line for line in result.stdout.splitlines() if line.strip()]
-    if not lines:
-        raise RuntimeError("Ingest returned empty stdout")
-    ingest_payload = json.loads(lines[-1])
     return ingest_seconds, ingest_payload, index_path
 
 
@@ -683,43 +792,56 @@ def write_results_artifacts(
     return json_path, csv_path
 
 
-def build_results_markdown(report: dict[str, Any]) -> str:
-    """Render markdown block used for documentation snapshot update."""
+def sample_size_summary(report: dict[str, Any]) -> tuple[dict[str, int], dict[str, int], int]:
+    """Extract sampled and evaluation split query counts per language."""
 
-    lines: list[str] = []
-    run_meta = report["run_meta"]
     settings = report["settings"]
+    language_meta = report["dataset_meta"]["languages"]
+    sampled_by_language = {
+        str(row["language"]): int(row.get("queries_selected", 0))
+        for row in language_meta
+    }
+    split_counts_by_language = {
+        str(row["language"]): {
+            str(split): int(count)
+            for split, count in row.get("query_split_counts", {}).items()
+        }
+        for row in language_meta
+    }
+    eval_split = str(settings["evaluation_split"])
+    eval_counts_by_language = {
+        language: split_counts_by_language.get(language, {}).get(eval_split, 0)
+        for language in settings["languages"]
+    }
+    total_eval_count = sum(eval_counts_by_language.values())
+    return sampled_by_language, eval_counts_by_language, total_eval_count
 
-    lines.append(f"- Generated at: `{run_meta['timestamp_utc']}`")
-    lines.append(f"- Dataset: `{DATASET_ID}` @ `{DATASET_REVISION}`")
-    lines.append(f"- Languages: `{', '.join(settings['languages'])}`")
-    lines.append(f"- Queries per language: `{settings['queries_per_lang']}`")
-    lines.append(
-        "- Query splits: "
-        f"`train={settings['split_train_ratio']:.1%}`, "
-        f"`validation={settings['split_validation_ratio']:.1%}`, "
-        f"`test={(1.0 - settings['split_train_ratio'] - settings['split_validation_ratio']):.1%}` "
-        f"(metrics on `{settings['evaluation_split']}`)"
-    )
-    lines.append(f"- Top-K: `{settings['top_k']}`")
-    lines.append("")
+
+def append_per_language_results(lines: list[str], report: dict[str, Any]) -> None:
+    """Append per-language benchmark table to markdown output."""
+
     lines.append("### Per-Language Results")
     lines.append("")
     lines.append(
-        "| language | model | recall@1 | recall@5 | mrr@10 | p50 latency (ms) | p95 latency (ms) | ingest (s) |"
+        "| language | model | n_test | recall@1 | recall@5 | mrr@10 | p50 latency (ms) | p95 latency (ms) | ingest (s) |"
     )
-    lines.append("|---|---|---:|---:|---:|---:|---:|---:|")
+    lines.append("|---|---|---:|---:|---:|---:|---:|---:|---:|")
     for row in report["results"]:
         metrics = row["metrics"]
         lines.append(
             "| "
-            f"{row['language']} | {row['model']} | {metrics['recall_at_1']:.4f} | "
+            f"{row['language']} | {row['model']} | {row['query_count']} | "
+            f"{metrics['recall_at_1']:.4f} | "
             f"{metrics['recall_at_5']:.4f} | {metrics['mrr_at_10']:.4f} | "
             f"{metrics['query_latency_ms_p50']:.2f} | {metrics['query_latency_ms_p95']:.2f} | "
             f"{row['ingest_seconds']:.2f} |"
         )
-
     lines.append("")
+
+
+def append_macro_ranking(lines: list[str], report: dict[str, Any]) -> None:
+    """Append macro ranking table to markdown output."""
+
     lines.append("### Macro Ranking (en/de)")
     lines.append("")
     lines.append(
@@ -734,8 +856,50 @@ def build_results_markdown(report: dict[str, Any]) -> str:
             f"{metric['mrr_at_10']:.4f} | {metric['query_latency_ms_p50']:.2f} | "
             f"{metric['query_latency_ms_p95']:.2f} | {metric['ingest_seconds']:.2f} |"
         )
-
     lines.append("")
+
+
+def build_results_markdown(report: dict[str, Any]) -> str:
+    """Render markdown block used for documentation snapshot update."""
+
+    lines: list[str] = []
+    run_meta = report["run_meta"]
+    settings = report["settings"]
+    sampled_by_language, eval_counts_by_language, total_eval_count = sample_size_summary(report)
+    eval_split = str(settings["evaluation_split"])
+
+    lines.append(f"- Generated at: `{run_meta['timestamp_utc']}`")
+    lines.append(f"- Dataset: `{DATASET_ID}` @ `{DATASET_REVISION}`")
+    lines.append(f"- Languages: `{', '.join(settings['languages'])}`")
+    lines.append(f"- Queries per language: `{settings['queries_per_lang']}`")
+    lines.append(
+        "- Query splits: "
+        f"`train={settings['split_train_ratio']:.1%}`, "
+        f"`validation={settings['split_validation_ratio']:.1%}`, "
+        f"`test={(1.0 - settings['split_train_ratio'] - settings['split_validation_ratio']):.1%}` "
+        f"(metrics on `{settings['evaluation_split']}`)"
+    )
+    sampled_parts = [
+        f"{language}={sampled_by_language.get(language, 0)}"
+        for language in settings["languages"]
+    ]
+    lines.append(f"- Sample size (sampled queries): `{', '.join(sampled_parts)}`")
+    eval_parts = [
+        f"{language}={eval_counts_by_language.get(language, 0)}"
+        for language in settings["languages"]
+    ]
+    lines.append(
+        f"- Sample size (evaluation `{eval_split}`): `{', '.join(eval_parts)}`, "
+        f"`total={total_eval_count}`"
+    )
+    lines.append(
+        f"- Chunking (benchmark ingest): `chunk_size={settings['chunk_size']}`, "
+        f"`chunk_overlap={settings['chunk_overlap']}`"
+    )
+    lines.append(f"- Top-K: `{settings['top_k']}`")
+    lines.append("")
+    append_per_language_results(lines, report)
+    append_macro_ranking(lines, report)
     lines.append("### Reproduction Command")
     lines.append("")
     lines.append("```bash")
@@ -779,6 +943,10 @@ def format_command_for_meta(args: argparse.Namespace) -> str:
         str(args.seed),
         "--top-k",
         str(args.top_k),
+        "--chunk-size",
+        str(args.chunk_size),
+        "--chunk-overlap",
+        str(args.chunk_overlap),
         "--languages",
         ",".join(args.languages),
         "--models-file",
@@ -853,12 +1021,17 @@ def main() -> None:
         for model_name in models:
             slug = model_slug(model_name)
             print(f"[benchmark] language={language} model={model_name}", flush=True)
+            ingest_config = IngestConfig(
+                model_name=model_name,
+                allow_model_download=args.allow_model_download,
+                chunk_size=args.chunk_size,
+                chunk_overlap=args.chunk_overlap,
+            )
             ingest_seconds, ingest_payload, index_path = run_ingest(
                 language=language,
-                model_name=model_name,
                 model_path_slug=slug,
                 work_dir=work_dir,
-                allow_model_download=args.allow_model_download,
+                config=ingest_config,
             )
             responses, latencies_ms = query_session(
                 queries=queries,
@@ -907,6 +1080,8 @@ def main() -> None:
             "queries_per_lang": args.queries_per_lang,
             "seed": args.seed,
             "top_k": args.top_k,
+            "chunk_size": args.chunk_size,
+            "chunk_overlap": args.chunk_overlap,
             "languages": args.languages,
             "split_train_ratio": SPLIT_TRAIN_RATIO,
             "split_validation_ratio": SPLIT_VALIDATION_RATIO,
