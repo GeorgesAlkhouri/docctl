@@ -1,0 +1,18 @@
+codecov:
+  notify:
+    wait_for_ci: true
+
+coverage:
+  status:
+    project:
+      default:
+        enabled: false
+    patch:
+      default:
+        enabled: false
+
+ignore:
+  - "tests/**"
+  - "docs/**"
+  - "scripts/**"
+  - "benchmarks/**"
