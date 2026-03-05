@@ -86,9 +86,7 @@ def test_handle_error_maps_generic_exception_to_internal_exit(
     assert calls[-1] == ("error: boom", True)
 
 
-def test_catalog_command_handles_runtime_exception(
-    runner, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_catalog_command_handles_runtime_exception(runner, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         cli,
         "collect_catalog",
@@ -114,9 +112,7 @@ def test_doctor_command_fails_when_report_is_not_ok(
     assert "doctor checks failed" in result.output
 
 
-def test_session_command_handles_runtime_exception(
-    runner, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_session_command_handles_runtime_exception(runner, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         cli,
         "run_session_requests",

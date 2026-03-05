@@ -143,12 +143,16 @@ def test_discover_pdf_files_rejects_non_pdf_file(tmp_path: Path) -> None:
     file_path.write_text("x", encoding="utf-8")
 
     with pytest.raises(InputPathNotFoundError):
-        service_ingest.discover_pdf_files(input_path=file_path, recursive=False, glob_pattern="*.pdf")
+        service_ingest.discover_pdf_files(
+            input_path=file_path, recursive=False, glob_pattern="*.pdf"
+        )
 
 
 def test_discover_pdf_files_raises_when_directory_has_no_pdfs(tmp_path: Path) -> None:
     with pytest.raises(InputPathNotFoundError):
-        service_ingest.discover_pdf_files(input_path=tmp_path, recursive=False, glob_pattern="*.pdf")
+        service_ingest.discover_pdf_files(
+            input_path=tmp_path, recursive=False, glob_pattern="*.pdf"
+        )
 
 
 def test_ingest_document_raises_when_chunker_returns_no_chunks(
@@ -162,7 +166,9 @@ def test_ingest_document_raises_when_chunker_returns_no_chunks(
         title="doc",
         content_hash="hash",
     )
-    monkeypatch.setattr(service_ingest, "extract_pdf_pages", lambda _: [PageText(page=1, text="text")])
+    monkeypatch.setattr(
+        service_ingest, "extract_pdf_pages", lambda _: [PageText(page=1, text="text")]
+    )
     monkeypatch.setattr(service_ingest, "chunk_document_pages", lambda **kwargs: [])
 
     with pytest.raises(EmptyExtractedTextError):
@@ -257,7 +263,9 @@ def test_finalize_manifest_skips_write_when_nothing_indexed(
     manifest = {"documents": {}}
     state = service_ingest._IngestState(indexed_files=0)
     monkeypatch.setattr(
-        service_ingest, "write_manifest", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError)
+        service_ingest,
+        "write_manifest",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError),
     )
 
     service_ingest._finalize_manifest(request=request, manifest=manifest, state=state)
@@ -285,7 +293,9 @@ def test_raise_if_no_indexed_files_branches() -> None:
         service_ingest._raise_if_no_indexed_files(state=empty_state)
 
 
-def test_suppress_external_output_disabled_leaves_streams_visible(capsys: pytest.CaptureFixture[str]) -> None:
+def test_suppress_external_output_disabled_leaves_streams_visible(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     with service_session.suppress_external_output(enabled=False):
         print("visible")
     assert capsys.readouterr().out.strip() == "visible"
@@ -298,7 +308,9 @@ def test_session_runtime_search_raises_for_empty_index(tmp_path: Path) -> None:
         store_factory=lambda **kwargs: store,
     )
     runtime = service_session.SessionRuntime(
-        request=SessionStreamRequest(config=_config(tmp_path), request_lines=[], allow_model_download=False),
+        request=SessionStreamRequest(
+            config=_config(tmp_path), request_lines=[], allow_model_download=False
+        ),
         deps=deps,
     )
     request = service_session._SessionSearchRequest(
@@ -324,7 +336,9 @@ def test_session_runtime_show_stats_catalog_and_doctor(
         store_factory=lambda **kwargs: store,
     )
     runtime = service_session.SessionRuntime(
-        request=SessionStreamRequest(config=_config(tmp_path), request_lines=[], allow_model_download=False),
+        request=SessionStreamRequest(
+            config=_config(tmp_path), request_lines=[], allow_model_download=False
+        ),
         deps=deps,
     )
     monkeypatch.setattr(
@@ -382,7 +396,9 @@ def test_parse_payload_and_operation_validation_errors() -> None:
 
 def test_operation_helpers_delegate_to_runtime_methods(tmp_path: Path) -> None:
     runtime = service_session.SessionRuntime(
-        request=SessionStreamRequest(config=_config(tmp_path), request_lines=[], allow_model_download=False),
+        request=SessionStreamRequest(
+            config=_config(tmp_path), request_lines=[], allow_model_download=False
+        ),
         deps=ServiceDependencies(
             embedding_factory=lambda **kwargs: object(),
             store_factory=lambda **kwargs: _SessionStore(),
@@ -396,7 +412,9 @@ def test_operation_helpers_delegate_to_runtime_methods(tmp_path: Path) -> None:
 
 def test_search_and_show_handlers_validate_required_fields(tmp_path: Path) -> None:
     runtime = service_session.SessionRuntime(
-        request=SessionStreamRequest(config=_config(tmp_path), request_lines=[], allow_model_download=False),
+        request=SessionStreamRequest(
+            config=_config(tmp_path), request_lines=[], allow_model_download=False
+        ),
         deps=ServiceDependencies(
             embedding_factory=lambda **kwargs: object(),
             store_factory=lambda **kwargs: _SessionStore(),

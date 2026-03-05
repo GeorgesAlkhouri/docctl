@@ -168,7 +168,9 @@ def test_extract_with_pypdf_wraps_unexpected_error(
         pdf_extract._extract_with_pypdf(tmp_path / "sample.pdf")
 
 
-def test_extract_pdf_pages_falls_back_to_pypdf(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_extract_pdf_pages_falls_back_to_pypdf(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     monkeypatch.setattr(
         pdf_extract,
         "_extract_with_pdfplumber",
