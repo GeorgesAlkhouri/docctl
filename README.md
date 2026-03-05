@@ -3,11 +3,11 @@
 `docctl` is a local-first CLI for ingesting PDFs and retrieving provenance-grounded answers with predictable machine-readable output.
 
 [![CI](https://img.shields.io/github/actions/workflow/status/GeorgesAlkhouri/docctl/ci.yml?branch=main&style=for-the-badge&label=CI)](.github/workflows/ci.yml)
+[![Coverage](https://img.shields.io/codecov/c/github/GeorgesAlkhouri/docctl?style=for-the-badge&label=coverage)](https://app.codecov.io/gh/GeorgesAlkhouri/docctl)
 [![Python 3.12](https://img.shields.io/badge/python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/downloads/release/python-3120/)
 [![Local-first](https://img.shields.io/badge/local--first-no%20cloud%20required-2EA44F?style=for-the-badge)](https://github.com/GeorgesAlkhouri/docctl)
 [![Chroma](https://img.shields.io/badge/chroma-vector%20store-FF6F00?style=for-the-badge)](https://docs.trychroma.com/)
 [![LlamaIndex](https://img.shields.io/badge/llamaindex-sentence--aware%20chunking-0E8A16?style=for-the-badge)](https://docs.llamaindex.ai/)
-[![Deterministic JSON](https://img.shields.io/badge/output-deterministic%20json-1F6FEB?style=for-the-badge)](https://github.com/GeorgesAlkhouri/docctl)
 
 ## Why docctl
 - Runs locally with a persistent Chroma-backed index.
@@ -89,6 +89,7 @@ make typecheck
 make security-lint
 make import-lint
 make test
+make test-cov
 make check-markdown-links
 ```
 

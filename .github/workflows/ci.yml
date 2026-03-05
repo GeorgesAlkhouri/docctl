@@ -74,8 +74,60 @@ jobs:
       - name: Install dependencies from lockfile
         run: uv sync --frozen --dev
 
-      - name: Run pytest
-        run: make SHELL=/bin/bash test
+      - name: Run pytest with coverage
+        run: make SHELL=/bin/bash test-cov
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: coverage.xml
+          if-no-files-found: error
+
+      - name: Upload coverage to Codecov
+        if: ${{ secrets.CODECOV_TOKEN != '' }}
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage.xml
+          flags: pytest
+          name: pytest-coverage
+          fail_ci_if_error: true
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Codecov not configured
+        if: ${{ secrets.CODECOV_TOKEN == '' }}
+        run: echo "::notice::Skipping Codecov upload because CODECOV_TOKEN is not configured."
+
+  sonar-analysis:
+    name: Sonar quality gate
+    runs-on: ubuntu-24.04
+    needs:
+      - test
+    timeout-minutes: 20
+    if: ${{ secrets.SONAR_TOKEN != '' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Download coverage artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-xml
+
+      - name: Run SonarQube scan
+        uses: SonarSource/sonarqube-scan-action@v7
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_ORGANIZATION: georgesalkhouri
+          SONAR_PROJECT_KEY: GeorgesAlkhouri_docctl
+        with:
+          args: >
+            -Dsonar.organization=${{ env.SONAR_ORGANIZATION }}
+            -Dsonar.projectKey=${{ env.SONAR_PROJECT_KEY }}
+            -Dsonar.qualitygate.wait=true
 
   markdown-link-check:
     name: Markdown link checks

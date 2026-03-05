@@ -1,7 +1,7 @@
 SHELL := /bin/zsh
 UV ?= uv
 
-.PHONY: sync test lint lint-preview typecheck typecheck-changed security-lint import-lint format format-check check-markdown-links help
+.PHONY: sync test test-cov lint lint-preview typecheck typecheck-changed security-lint import-lint format format-check check-markdown-links help
 
 help:
 	@echo "Targets:"
@@ -15,6 +15,7 @@ help:
 	@echo "  make format - apply ruff formatter"
 	@echo "  make format-check - verify ruff formatting"
 	@echo "  make test  - run unit, integration and acceptance tests"
+	@echo "  make test-cov - run tests and write coverage report to coverage.xml"
 	@echo "  make check-markdown-links - validate markdown links with lychee"
 
 sync:
@@ -49,6 +50,9 @@ format-check:
 
 test:
 	$(UV) run pytest tests/unit tests/integration tests/acceptance -q
+
+test-cov:
+	$(UV) run pytest tests/unit tests/integration tests/acceptance -q --cov=src/docctl --cov-report=term --cov-report=xml:coverage.xml
 
 check-markdown-links:
 	@./scripts/check-markdown-links.sh
