@@ -7,7 +7,7 @@ from pathlib import Path
 
 DEFAULT_INDEX_PATH = Path(".docctl")
 DEFAULT_COLLECTION = "default"
-DEFAULT_EMBEDDING_MODEL = "paraphrase-multilingual-MiniLM-L12-v2"
+DEFAULT_EMBEDDING_MODEL = "jinaai/jina-embeddings-v5-text-small-retrieval"
 ENV_REQUIRE_WRITE_APPROVAL = "DOCCTL_REQUIRE_WRITE_APPROVAL"
 ENV_EMBEDDING_MODEL = "DOCCTL_EMBEDDING_MODEL"
 

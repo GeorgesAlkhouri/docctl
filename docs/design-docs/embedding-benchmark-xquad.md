@@ -79,6 +79,8 @@ runtime defaults in `src/docctl/chunking.py`.
 | de | paraphrase-multilingual-MiniLM-L12-v2 | 120 | 0.7917 | 0.9333 | 0.8442 | 25.56 | 60.96 | 22.46 |
 | de | paraphrase-multilingual-mpnet-base-v2 | 120 | 0.8167 | 0.9667 | 0.8808 | 25.79 | 63.02 | 28.76 |
 | de | distiluse-base-multilingual-cased-v2 | 120 | 0.8333 | 0.9417 | 0.8865 | 22.13 | 49.03 | 21.52 |
+| en | jinaai/jina-embeddings-v5-text-small-retrieval | 120 | 0.9583 | 0.9917 | 0.9720 | 143.03 | 614.53 | 116.62 |
+| de | jinaai/jina-embeddings-v5-text-small-retrieval | 120 | 0.9083 | 0.9833 | 0.9389 | 191.11 | 341.42 | 117.04 |
 
 ### Macro Ranking (en/de)
 
@@ -87,6 +89,7 @@ runtime defaults in `src/docctl/chunking.py`.
 | 1 | distiluse-base-multilingual-cased-v2 | 0.8375 | 0.9542 | 0.8932 | 21.23 | 48.74 | 19.40 |
 | 2 | paraphrase-multilingual-mpnet-base-v2 | 0.8292 | 0.9625 | 0.8860 | 24.69 | 128.89 | 25.10 |
 | 3 | paraphrase-multilingual-MiniLM-L12-v2 | 0.8292 | 0.9583 | 0.8816 | 21.06 | 98.83 | 21.93 |
+| 4 | jinaai/jina-embeddings-v5-text-small-retrieval | 0.9333 | 0.9875 | 0.9555 | 167.07 | 477.98 | 116.83 |
 
 ### Reproduction Command
 
