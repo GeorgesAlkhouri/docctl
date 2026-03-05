@@ -85,7 +85,6 @@ jobs:
           if-no-files-found: error
 
       - name: Upload coverage to Codecov
-        if: ${{ secrets.CODECOV_TOKEN != '' }}
         uses: codecov/codecov-action@v5
         with:
           files: coverage.xml
@@ -94,17 +93,12 @@ jobs:
           fail_ci_if_error: true
           token: ${{ secrets.CODECOV_TOKEN }}
 
-      - name: Codecov not configured
-        if: ${{ secrets.CODECOV_TOKEN == '' }}
-        run: echo "::notice::Skipping Codecov upload because CODECOV_TOKEN is not configured."
-
   sonar-analysis:
     name: Sonar quality gate
     runs-on: ubuntu-24.04
     needs:
       - test
     timeout-minutes: 20
-    if: ${{ secrets.SONAR_TOKEN != '' }}
 
     steps:
       - name: Checkout
