@@ -1,8 +1,10 @@
 <p align="center">
-  <img src="docs/assets/docctl_logo.png" alt="docctl logo" width="560" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/docctl_logo_dark.png" />
+    <source media="(prefers-color-scheme: light)" srcset="docs/assets/docctl_logo_light.png" />
+    <img alt="docctl logo" src="docs/assets/docctl_logo_light.png" width="560" />
+  </picture>
 </p>
-
-<h1 align="center">docctl</h1>
 
 <p align="center">
   Local-first CLI for ingesting PDFs and retrieving provenance-grounded answers
