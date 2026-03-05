@@ -1,13 +1,37 @@
-# docctl
+<p align="center">
+  <img src="docs/assets/docctl_logo.png" alt="docctl logo" width="560" />
+</p>
 
-`docctl` is a local-first CLI for ingesting PDFs and retrieving provenance-grounded answers with predictable machine-readable output.
+<h1 align="center">docctl</h1>
 
-[![CI](https://img.shields.io/github/actions/workflow/status/GeorgesAlkhouri/docctl/ci.yml?branch=main&style=for-the-badge&label=ci&logo=githubactions&logoColor=white)](.github/workflows/ci.yml)
-[![Quality Gate](https://img.shields.io/sonar/quality_gate/GeorgesAlkhouri_docctl?server=https%3A%2F%2Fsonarcloud.io&style=for-the-badge&label=quality%20gate&logo=sonar&logoColor=white)](https://sonarcloud.io/summary/new_code?id=GeorgesAlkhouri_docctl)
-[![Codecov](https://img.shields.io/codecov/c/github/GeorgesAlkhouri/docctl?style=for-the-badge&logo=codecov&logoColor=white&label=codecov)](https://codecov.io/gh/GeorgesAlkhouri/docctl)
-[![Python 3.12](https://img.shields.io/badge/python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/downloads/release/python-3120/)
-[![Local-first](https://img.shields.io/badge/local--first-no%20cloud%20required-2EA44F?style=for-the-badge&logo=homeassistant&logoColor=white)](https://github.com/GeorgesAlkhouri/docctl)
-[![Chroma](https://img.shields.io/badge/chroma-vector%20store-FF6F00?style=for-the-badge&logo=sqlite&logoColor=white)](https://docs.trychroma.com/)
+<p align="center">
+  Local-first CLI for ingesting PDFs and retrieving provenance-grounded answers
+  with predictable machine-readable output.
+</p>
+
+<p align="center">
+  <a href=".github/workflows/ci.yml">
+    <img alt="CI" src="https://img.shields.io/github/actions/workflow/status/GeorgesAlkhouri/docctl/ci.yml?branch=main&style=for-the-badge&label=ci&logo=githubactions&logoColor=white" />
+  </a>
+  <a href="https://sonarcloud.io/summary/new_code?id=GeorgesAlkhouri_docctl">
+    <img alt="Quality Gate" src="https://img.shields.io/sonar/quality_gate/GeorgesAlkhouri_docctl?server=https%3A%2F%2Fsonarcloud.io&style=for-the-badge&label=quality%20gate&logo=sonar&logoColor=white" />
+  </a>
+  <a href="https://codecov.io/gh/GeorgesAlkhouri/docctl">
+    <img alt="Codecov" src="https://img.shields.io/codecov/c/github/GeorgesAlkhouri/docctl?style=for-the-badge&logo=codecov&logoColor=white&label=codecov" />
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://www.python.org/downloads/release/python-3120/">
+    <img alt="Python 3.12" src="https://img.shields.io/badge/python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white" />
+  </a>
+  <a href="https://github.com/GeorgesAlkhouri/docctl">
+    <img alt="Local-first" src="https://img.shields.io/badge/local--first-no%20cloud%20required-2EA44F?style=for-the-badge&logo=homeassistant&logoColor=white" />
+  </a>
+  <a href="https://docs.trychroma.com/">
+    <img alt="Chroma" src="https://img.shields.io/badge/chroma-vector%20store-FF6F00?style=for-the-badge&logo=sqlite&logoColor=white" />
+  </a>
+</p>
 
 ## Why docctl
 - Runs locally with a persistent Chroma-backed index.
