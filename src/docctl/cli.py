@@ -39,6 +39,8 @@ app = typer.Typer(
     help="docctl is a CLI-first local document retrieval tool.",
 )
 
+ALLOW_MODEL_DOWNLOAD_HELP = "Allow downloading missing embedding model artifacts."
+
 
 def _emit_success(*, config: CliConfig, payload: dict[str, Any]) -> None:
     if config.json_output:
@@ -138,7 +140,7 @@ def ingest(
     allow_model_download: bool = typer.Option(
         False,
         "--allow-model-download",
-        help="Allow downloading missing embedding model artifacts.",
+        help=ALLOW_MODEL_DOWNLOAD_HELP,
     ),
 ) -> None:
     """Ingest one PDF file or directory into the local index.
@@ -184,7 +186,7 @@ def search(
     allow_model_download: bool = typer.Option(
         False,
         "--allow-model-download",
-        help="Allow downloading missing embedding model artifacts.",
+        help=ALLOW_MODEL_DOWNLOAD_HELP,
     ),
 ) -> None:
     """Search indexed chunks and emit ranked results.
@@ -226,7 +228,7 @@ def show(
     allow_model_download: bool = typer.Option(
         False,
         "--allow-model-download",
-        help="Allow downloading missing embedding model artifacts.",
+        help=ALLOW_MODEL_DOWNLOAD_HELP,
     ),
 ) -> None:
     """Show one indexed chunk by id.
@@ -285,7 +287,7 @@ def doctor(
     allow_model_download: bool = typer.Option(
         False,
         "--allow-model-download",
-        help="Allow downloading missing embedding model artifacts.",
+        help=ALLOW_MODEL_DOWNLOAD_HELP,
     ),
 ) -> None:
     """Run local diagnostics for index and embedding readiness.
@@ -311,7 +313,7 @@ def session(
     allow_model_download: bool = typer.Option(
         False,
         "--allow-model-download",
-        help="Allow downloading missing embedding model artifacts.",
+        help=ALLOW_MODEL_DOWNLOAD_HELP,
     ),
 ) -> None:
     """Run a read-only NDJSON request session on standard streams.

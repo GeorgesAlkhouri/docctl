@@ -2,12 +2,12 @@
 
 `docctl` is a local-first CLI for ingesting PDFs and retrieving provenance-grounded answers with predictable machine-readable output.
 
-[![CI](https://img.shields.io/github/actions/workflow/status/GeorgesAlkhouri/docctl/ci.yml?branch=main&style=for-the-badge&label=CI)](.github/workflows/ci.yml)
-[![Coverage](https://img.shields.io/codecov/c/github/GeorgesAlkhouri/docctl?style=for-the-badge&label=coverage)](https://app.codecov.io/gh/GeorgesAlkhouri/docctl)
+[![CI](https://img.shields.io/github/actions/workflow/status/GeorgesAlkhouri/docctl/ci.yml?branch=main&style=for-the-badge&label=ci&logo=githubactions&logoColor=white)](.github/workflows/ci.yml)
+[![Quality Gate](https://img.shields.io/sonar/quality_gate/GeorgesAlkhouri_docctl?server=https%3A%2F%2Fsonarcloud.io&style=for-the-badge&label=quality%20gate&logo=sonar&logoColor=white)](https://sonarcloud.io/summary/new_code?id=GeorgesAlkhouri_docctl)
+[![Codecov](https://img.shields.io/codecov/c/github/GeorgesAlkhouri/docctl?style=for-the-badge&logo=codecov&logoColor=white&label=codecov)](https://codecov.io/gh/GeorgesAlkhouri/docctl)
 [![Python 3.12](https://img.shields.io/badge/python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/downloads/release/python-3120/)
-[![Local-first](https://img.shields.io/badge/local--first-no%20cloud%20required-2EA44F?style=for-the-badge)](https://github.com/GeorgesAlkhouri/docctl)
-[![Chroma](https://img.shields.io/badge/chroma-vector%20store-FF6F00?style=for-the-badge)](https://docs.trychroma.com/)
-[![LlamaIndex](https://img.shields.io/badge/llamaindex-sentence--aware%20chunking-0E8A16?style=for-the-badge)](https://docs.llamaindex.ai/)
+[![Local-first](https://img.shields.io/badge/local--first-no%20cloud%20required-2EA44F?style=for-the-badge&logo=homeassistant&logoColor=white)](https://github.com/GeorgesAlkhouri/docctl)
+[![Chroma](https://img.shields.io/badge/chroma-vector%20store-FF6F00?style=for-the-badge&logo=sqlite&logoColor=white)](https://docs.trychroma.com/)
 
 ## Why docctl
 - Runs locally with a persistent Chroma-backed index.
