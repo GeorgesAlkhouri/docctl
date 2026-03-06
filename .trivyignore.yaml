@@ -1,0 +1,15 @@
+# Trivy suppression policy:
+# - Every exception must include both `expired_at` and `statement`.
+# - Keep entries narrowly scoped and time-bound.
+# - Remove entries once remediations are available.
+#
+# Example:
+# vulnerabilities:
+#   - id: CVE-2026-0001
+#     expired_at: 2026-06-30
+#     statement: Temporary risk acceptance until upstream fix is adopted.
+
+vulnerabilities: []
+misconfigurations: []
+secrets: []
+licenses: []
