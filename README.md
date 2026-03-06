@@ -24,8 +24,8 @@
 </p>
 
 <p align="center">
-  <a href="https://www.python.org/downloads/release/python-3120/">
-    <img alt="Python 3.12" src="https://img.shields.io/badge/python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white" />
+  <a href="https://www.python.org/downloads/release/python-3130/">
+    <img alt="Python 3.13" src="https://img.shields.io/badge/python-3.13-3776AB?style=for-the-badge&logo=python&logoColor=white" />
   </a>
   <a href="https://github.com/GeorgesAlkhouri/docctl">
     <img alt="Local-first" src="https://img.shields.io/badge/local--first-no%20cloud%20required-2EA44F?style=for-the-badge&logo=homeassistant&logoColor=white" />
@@ -44,7 +44,7 @@
 
 ## Quickstart
 Requirements:
-- Python 3.12
+- Python 3.13
 - `uv`
 
 ```bash

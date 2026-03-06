@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   lint-and-static-analysis:
-    name: Lint and static analysis (Python 3.12)
+    name: Lint and static analysis (Python 3.13)
     runs-on: ubuntu-24.04
     timeout-minutes: 20
 
@@ -27,7 +27,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: '3.12'
+          python-version: '3.13'
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
@@ -53,7 +53,7 @@ jobs:
         run: make SHELL=/bin/bash import-lint
 
   test:
-    name: Test suite (Python 3.12)
+    name: Test suite (Python 3.13)
     runs-on: ubuntu-24.04
     timeout-minutes: 30
 
@@ -64,7 +64,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: '3.12'
+          python-version: '3.13'
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
