@@ -15,6 +15,9 @@
   <a href=".github/workflows/ci.yml">
     <img alt="CI" src="https://img.shields.io/github/actions/workflow/status/GeorgesAlkhouri/docctl/ci.yml?branch=main&style=for-the-badge&label=ci&logo=githubactions&logoColor=white" />
   </a>
+  <a href=".github/workflows/security-trivy.yml">
+    <img alt="Trivy" src="https://img.shields.io/github/actions/workflow/status/GeorgesAlkhouri/docctl/security-trivy.yml?branch=main&style=for-the-badge&label=trivy&logo=githubactions&logoColor=white" />
+  </a>
   <a href="https://sonarcloud.io/summary/new_code?id=GeorgesAlkhouri_docctl">
     <img alt="Quality Gate" src="https://img.shields.io/sonar/quality_gate/GeorgesAlkhouri_docctl?server=https%3A%2F%2Fsonarcloud.io&style=for-the-badge&label=quality%20gate&logo=sonar&logoColor=white" />
   </a>
