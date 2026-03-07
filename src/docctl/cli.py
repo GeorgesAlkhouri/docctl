@@ -127,12 +127,19 @@ def callback(
     )
 
 
-@app.command(help="Ingest one PDF or a directory of PDFs. This command mutates local index state.")
+@app.command(
+    help=(
+        "Ingest one supported document or a directory of supported documents. "
+        "This command mutates local index state."
+    )
+)
 def ingest(
     ctx: typer.Context,
-    path: Path = typer.Argument(..., help="Path to a PDF file or directory."),
+    path: Path = typer.Argument(
+        ..., help="Path to a supported file (.pdf/.docx/.txt/.md) or directory."
+    ),
     recursive: bool = typer.Option(False, "--recursive", help="Scan directories recursively."),
-    glob_pattern: str = typer.Option("*.pdf", "--glob", help="Glob pattern for file discovery."),
+    glob_pattern: str = typer.Option("*", "--glob", help="Glob pattern for file discovery."),
     force: bool = typer.Option(False, "--force", help="Force reingestion of known documents."),
     approve_write: bool = typer.Option(
         False, "--approve-write", help="Explicitly approve mutating writes."
@@ -143,13 +150,13 @@ def ingest(
         help=ALLOW_MODEL_DOWNLOAD_HELP,
     ),
 ) -> None:
-    """Ingest one PDF file or directory into the local index.
+    """Ingest one supported file or directory into the local index.
 
     Args:
         ctx: Typer context containing resolved configuration.
-        path: Path to a PDF file or directory.
+        path: Path to a supported file or directory.
         recursive: Whether directory traversal is recursive.
-        glob_pattern: Glob pattern used for PDF discovery.
+        glob_pattern: Glob pattern used for file discovery.
         force: Whether known documents should be reingested.
         approve_write: Explicit write approval for mutating operations.
         allow_model_download: Whether missing embedding models may be downloaded.
@@ -179,7 +186,6 @@ def search(
     doc_id: str | None = typer.Option(None, "--doc-id", help="Filter by document id."),
     source: str | None = typer.Option(None, "--source", help="Filter by source path."),
     title: str | None = typer.Option(None, "--title", help="Filter by document title."),
-    page: int | None = typer.Option(None, "--page", min=1, help="Filter by page number."),
     min_score: float | None = typer.Option(
         None, "--min-score", min=0.0, max=1.0, help="Minimum score."
     ),
@@ -198,7 +204,6 @@ def search(
         doc_id: Optional document id filter.
         source: Optional source path filter.
         title: Optional document title filter.
-        page: Optional page filter.
         min_score: Optional minimum score filter in [0.0, 1.0].
         allow_model_download: Whether missing embedding models may be downloaded.
     """
@@ -212,7 +217,6 @@ def search(
                 doc_id=doc_id,
                 source=source,
                 title=title,
-                page=page,
                 min_score=min_score,
                 allow_model_download=allow_model_download,
             )

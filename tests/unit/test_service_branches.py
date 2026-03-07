@@ -13,8 +13,7 @@ from docctl.errors import (
     EmptyIndexSearchError,
     InputPathNotFoundError,
 )
-from docctl.models import ChunkMetadata, ChunkRecord, DoctorCheck, DoctorReport
-from docctl.pdf_extract import PageText
+from docctl.models import ChunkMetadata, ChunkRecord, DoctorCheck, DoctorReport, TextUnit
 from docctl.service_types import (
     DoctorRequest,
     IngestRequest,
@@ -36,7 +35,12 @@ class _SessionStore:
         self._chunk = chunk or ChunkRecord(
             id="chunk-1",
             text="text",
-            metadata=ChunkMetadata(doc_id="d", source="s", title="t", page=1, section=None),
+            metadata=ChunkMetadata(
+                doc_id="d",
+                source="s",
+                title="t",
+                section=None,
+            ),
         )
 
     def count(self) -> int:
@@ -138,20 +142,20 @@ def test_doctor_test_query_skip_and_exception_paths() -> None:
     assert errors == ["query failed"]
 
 
-def test_discover_pdf_files_rejects_non_pdf_file(tmp_path: Path) -> None:
-    file_path = tmp_path / "notes.txt"
+def test_discover_supported_files_rejects_unsupported_file(tmp_path: Path) -> None:
+    file_path = tmp_path / "notes.csv"
     file_path.write_text("x", encoding="utf-8")
 
     with pytest.raises(InputPathNotFoundError):
-        service_ingest.discover_pdf_files(
-            input_path=file_path, recursive=False, glob_pattern="*.pdf"
+        service_ingest.discover_supported_files(
+            input_path=file_path, recursive=False, glob_pattern="*"
         )
 
 
-def test_discover_pdf_files_raises_when_directory_has_no_pdfs(tmp_path: Path) -> None:
+def test_discover_supported_files_raises_when_directory_has_no_matches(tmp_path: Path) -> None:
     with pytest.raises(InputPathNotFoundError):
-        service_ingest.discover_pdf_files(
-            input_path=tmp_path, recursive=False, glob_pattern="*.pdf"
+        service_ingest.discover_supported_files(
+            input_path=tmp_path, recursive=False, glob_pattern="*"
         )
 
 
@@ -167,9 +171,11 @@ def test_ingest_document_raises_when_chunker_returns_no_chunks(
         content_hash="hash",
     )
     monkeypatch.setattr(
-        service_ingest, "extract_pdf_pages", lambda _: [PageText(page=1, text="text")]
+        service_ingest,
+        "extract_document_units",
+        lambda _: [TextUnit(text="text")],
     )
-    monkeypatch.setattr(service_ingest, "chunk_document_pages", lambda **kwargs: [])
+    monkeypatch.setattr(service_ingest, "chunk_document_units", lambda **kwargs: [])
 
     with pytest.raises(EmptyExtractedTextError):
         service_ingest._ingest_document(file_path=pdf_path, context=context, store=_SessionStore())
@@ -319,7 +325,6 @@ def test_session_runtime_search_raises_for_empty_index(tmp_path: Path) -> None:
         doc_id=None,
         source=None,
         title=None,
-        page=None,
         min_score=None,
     )
 
@@ -351,7 +356,7 @@ def test_session_runtime_show_stats_catalog_and_doctor(
                 "d1": {
                     "source": "a.pdf",
                     "title": "a",
-                    "pages": 2,
+                    "units": 2,
                     "chunks": 4,
                     "content_hash": "h",
                     "last_ingest_at": "2026-01-01T00:00:00+00:00",
@@ -377,7 +382,7 @@ def test_session_runtime_show_stats_catalog_and_doctor(
 
     assert shown["id"] == "chunk-1"
     assert stats["chunk_count"] == 3
-    assert catalog["summary"]["pages_total"] == 2
+    assert catalog["summary"]["units_total"] == 2
     assert doctor["ok"] is True
 
 
@@ -425,6 +430,8 @@ def test_search_and_show_handlers_validate_required_fields(tmp_path: Path) -> No
         service_session._handle_search(runtime, {"query": "   ", "top_k": 5})
     with pytest.raises(DocctlError, match="invalid session request field 'top_k'"):
         service_session._handle_search(runtime, {"query": "ok", "top_k": 0})
+    with pytest.raises(DocctlError, match="invalid session request field 'source'"):
+        service_session._handle_search(runtime, {"query": "ok", "source": 7})
     with pytest.raises(DocctlError, match="invalid session request field 'chunk_id'"):
         service_session._handle_show(runtime, {"chunk_id": 7})
 
@@ -451,6 +458,8 @@ def test_run_session_requests_skips_blank_lines_and_reports_unsupported_op(tmp_p
 
 
 def test_build_where_filter_returns_doc_id_only_mapping() -> None:
-    assert service_session.build_where_filter(doc_id="d1", source=None, title=None, page=None) == {
-        "doc_id": "d1"
-    }
+    assert service_session.build_where_filter(
+        doc_id="d1",
+        source=None,
+        title=None,
+    ) == {"doc_id": "d1"}

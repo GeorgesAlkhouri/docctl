@@ -6,6 +6,13 @@ from dataclasses import dataclass
 from typing import Any
 
 
+@dataclass(slots=True, frozen=True)
+class TextUnit:
+    """Represent one extracted text unit."""
+
+    text: str
+
+
 @dataclass(slots=True)
 class ChunkMetadata:
     """Describe source metadata stored alongside each indexed chunk."""
@@ -13,7 +20,6 @@ class ChunkMetadata:
     doc_id: str
     source: str
     title: str
-    page: int
     section: str | None = None
 
 

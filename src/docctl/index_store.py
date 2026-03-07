@@ -9,7 +9,7 @@ from typing import Any, cast
 import chromadb
 from chromadb.api.types import Documents, Embeddable, EmbeddingFunction, Metadata, Where
 
-from .coerce import to_int, to_optional_str
+from .coerce import to_optional_str
 from .errors import ChunkNotFoundError, IndexNotInitializedError
 from .models import ChunkMetadata, ChunkRecord
 
@@ -82,7 +82,6 @@ class ChromaStore:
                     "doc_id": record.metadata.doc_id,
                     "source": record.metadata.source,
                     "title": record.metadata.title,
-                    "page": record.metadata.page,
                     "section": record.metadata.section,
                 }
                 for record in records
@@ -148,7 +147,6 @@ class ChromaStore:
                 doc_id=str(metadata.get("doc_id", "")),
                 source=str(metadata.get("source", "")),
                 title=str(metadata.get("title", "")),
-                page=to_int(metadata.get("page"), default=0),
                 section=to_optional_str(metadata.get("section")),
             ),
         )

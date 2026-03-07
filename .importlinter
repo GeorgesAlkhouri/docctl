@@ -15,6 +15,7 @@ source_modules =
 forbidden_modules =
     docctl.chunking
     docctl.cli
+    docctl.document_extract
     docctl.embeddings
     docctl.index_store
     docctl.pdf_extract
@@ -31,6 +32,7 @@ name = Capability modules do not depend on orchestration
 type = forbidden
 source_modules =
     docctl.chunking
+    docctl.document_extract
     docctl.embeddings
     docctl.index_store
     docctl.pdf_extract

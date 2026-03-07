@@ -11,7 +11,7 @@ from typing import Any
 
 from chromadb.api.types import Documents, EmbeddingFunction
 
-from .coerce import parse_optional_float, parse_optional_int, parse_optional_str
+from .coerce import parse_optional_float, parse_optional_str
 from .errors import DocctlError, EmptyIndexSearchError, InternalDocctlError
 from .service_doctor import run_doctor
 from .service_manifest import catalog_documents, load_manifest, manifest_documents
@@ -28,7 +28,6 @@ class _SessionSearchRequest:
     doc_id: str | None
     source: str | None
     title: str | None
-    page: int | None
     min_score: float | None
 
 
@@ -120,7 +119,6 @@ class SessionRuntime:
             doc_id=request.doc_id,
             source=request.source,
             title=request.title,
-            page=request.page,
         )
         result = store.query(query=request.query, top_k=request.top_k, where=where)
         hits = search_hits_from_result(result=result, min_score=request.min_score)
@@ -181,7 +179,7 @@ class SessionRuntime:
             "summary": {
                 "document_count": len(documents),
                 "chunk_count": self._get_readonly_store().count(),
-                "pages_total": sum(document["pages"] for document in documents),
+                "units_total": sum(document["units"] for document in documents),
                 "last_ingest_at": manifest.get("last_ingest_at"),
             },
             "documents": documents,
@@ -280,7 +278,6 @@ def _handle_search(runtime: SessionRuntime, payload: dict[str, Any]) -> dict[str
         doc_id=parse_optional_str(payload.get("doc_id"), field_name="doc_id"),
         source=parse_optional_str(payload.get("source"), field_name="source"),
         title=parse_optional_str(payload.get("title"), field_name="title"),
-        page=parse_optional_int(payload.get("page"), field_name="page", minimum=1),
         min_score=parse_optional_float(
             payload.get("min_score"),
             field_name="min_score",

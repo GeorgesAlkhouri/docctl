@@ -1,20 +1,20 @@
 ---
 name: "docctl-agent"
-description: "Agent skill for docctl PDF ingestion and provenance-grounded retrieval."
+description: "Agent skill for docctl multi-format ingestion and provenance-grounded retrieval."
 ---
 
 # docctl Agent Skill
 
 ## When to use
-- Use for document-grounded Q&A over local PDF corpora.
-- Use when answers must include provenance (`source`, `page`, `title`, `chunk_id`).
+- Use for document-grounded Q&A over local corpora (`.pdf`, `.docx`, `.txt`, `.md`).
+- Use when answers must include provenance (`source`, `title`, `chunk_id`).
 - Use when the agent can execute shell commands.
 
 ## Scope and non-scope
 - In scope:
   - `docctl ingest`, `search`, `show`, `stats`, `doctor`, and `session` orchestration.
   - Full lifecycle behavior: bootstrap ingest plus retrieval loops.
-  - Metadata-constrained retrieval using `doc_id`, `source`, `title`, and `page`.
+  - Metadata-constrained retrieval using `doc_id`, `source`, and `title`.
 - Out of scope (agent-owned responsibilities):
   - Query rewriting and query decomposition.
   - Conversation context handling and prior-turn memory policy.
@@ -26,7 +26,7 @@ description: "Agent skill for docctl PDF ingestion and provenance-grounded retri
 - Expected inputs:
   - user question,
   - optional corpus path(s),
-  - optional retrieval filters (`doc_id`, `source`, `title`, `page`),
+  - optional retrieval filters (`doc_id`, `source`, `title`),
   - optional index settings.
 - Default CLI assumptions:
   - `--index-path ./.docctl`
@@ -67,19 +67,19 @@ description: "Agent skill for docctl PDF ingestion and provenance-grounded retri
 - `search`:
   - Use for one-shot retrieval.
   - Do not chain multiple `search`/`show`/`stats`/`catalog` calls via separate tool invocations for the same workflow; switch to `session`.
-  - Relevant options: `--doc-id`, `--source`, `--title`, `--page`, `--top-k`, `--min-score`.
+  - Relevant options: `--doc-id`, `--source`, `--title`, `--top-k`, `--min-score`.
 - `session`:
   - Use for iterative retrieval workflows.
   - Preferred default for multi-step work: keep one session open and submit all read operations (`search`, `show`, `stats`, `catalog`, `doctor`) as NDJSON lines.
   - Supported operations: `search`, `show`, `stats`, `catalog`, `doctor`.
-  - Search request accepts optional fields: `doc_id`, `source`, `title`, `page`, `top_k`, `min_score`.
+  - Search request accepts optional fields: `doc_id`, `source`, `title`, `top_k`, `min_score`.
 - `show`:
   - Use to inspect and quote exact chunk evidence by `chunk_id`.
 - `stats`:
   - Do not run by default in retrieval loops.
   - Use when quick aggregate counts are needed.
 - `catalog`:
-  - Use to inspect per-document inventory (`doc_id`, `source`, `title`, `pages`, `chunks`) with summary stats.
+  - Use to inspect per-document inventory (`doc_id`, `source`, `title`, `units`, `chunks`) with summary stats.
 - `doctor`:
   - Do not run by default in retrieval loops because it adds latency.
   - Use only to diagnose environment/config failures or unexpected runtime behavior.
@@ -110,7 +110,6 @@ Return a structured payload (or equivalent human-readable response) with:
 - `answer`: grounded response text.
 - `citations`: list of objects with:
   - `source`
-  - `page`
   - `chunk_id`
   - `title`
 - `confidence`: one of `high`, `medium`, `low`.
@@ -141,7 +140,7 @@ EOF
 - Tool-use correctness:
   - sequence follows readiness -> ingest-if-needed -> retrieval -> evidence inspection.
 - Citation completeness:
-  - claims map to retrieved chunks with `source` and `page`.
+  - claims map to retrieved chunks with `source` and chunk metadata.
 - Boundary adherence:
   - query rewriting is handled by the agent, not attributed to `docctl`.
 - Regression control:

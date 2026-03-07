@@ -7,6 +7,14 @@ def test_build_doc_id_is_stable() -> None:
 
 
 def test_build_chunk_id_is_stable() -> None:
-    first = build_chunk_id("doc-1", page=3, chunk_index=2, text="sample chunk")
-    second = build_chunk_id("doc-1", page=3, chunk_index=2, text="sample chunk")
+    first = build_chunk_id(
+        "doc-1",
+        chunk_index=2,
+        text="sample chunk",
+    )
+    second = build_chunk_id(
+        "doc-1",
+        chunk_index=2,
+        text="sample chunk",
+    )
     assert first == second

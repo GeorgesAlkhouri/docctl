@@ -1,18 +1,18 @@
-from docctl.chunking import chunk_document_pages
-from docctl.pdf_extract import PageText
+from docctl.chunking import chunk_document_units
+from docctl.models import TextUnit
 
 
 def test_chunking_preserves_required_metadata_fields() -> None:
-    pages = [
-        PageText(page=1, text="First sentence. Second sentence for chunking."),
-        PageText(page=2, text="Another page sentence for metadata."),
+    units = [
+        TextUnit(text="First sentence. Second sentence for chunking."),
+        TextUnit(text="Another page sentence for metadata."),
     ]
 
-    chunks = chunk_document_pages(
+    chunks = chunk_document_units(
         doc_id="doc-123",
         source="docs/input.pdf",
         title="input",
-        pages=pages,
+        units=units,
         chunk_size=80,
         chunk_overlap=10,
     )
@@ -22,4 +22,3 @@ def test_chunking_preserves_required_metadata_fields() -> None:
         assert chunk.metadata.doc_id == "doc-123"
         assert chunk.metadata.source == "docs/input.pdf"
         assert chunk.metadata.title == "input"
-        assert chunk.metadata.page in {1, 2}

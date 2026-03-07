@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import asdict
 from typing import Any
 
-from .coerce import to_int
 from .errors import ChunkNotFoundError, EmptyIndexSearchError
 from .models import ChunkMetadata, ChunkRecord, SearchHit
 from .service_types import SearchRequest, ServiceDependencies, ShowRequest
@@ -17,7 +16,6 @@ def build_where_filter(
     doc_id: str | None,
     source: str | None,
     title: str | None,
-    page: int | None,
 ) -> dict[str, Any] | None:
     """Build Chroma metadata filter for optional search fields.
 
@@ -25,7 +23,6 @@ def build_where_filter(
         doc_id: Optional document identifier filter.
         source: Optional source path filter.
         title: Optional title filter.
-        page: Optional page number filter.
 
     Returns:
         `None` when no filters are provided, one condition mapping for single
@@ -38,8 +35,6 @@ def build_where_filter(
         conditions.append({"source": source})
     if title:
         conditions.append({"title": title})
-    if page:
-        conditions.append({"page": int(page)})
 
     if not conditions:
         return None
@@ -101,7 +96,6 @@ def search_hits_from_result(
             doc_id=str(metadata_raw.get("doc_id", "")),
             source=str(metadata_raw.get("source", "")),
             title=str(metadata_raw.get("title", "")),
-            page=to_int(metadata_raw.get("page"), default=0),
             section=metadata_raw.get("section"),
         )
         hit = SearchHit(
@@ -150,7 +144,6 @@ def search_chunks(*, request: SearchRequest, deps: ServiceDependencies) -> dict[
         doc_id=request.doc_id,
         source=request.source,
         title=request.title,
-        page=request.page,
     )
     result = store.query(query=request.query, top_k=request.top_k, where=where)
     hits = search_hits_from_result(result=result, min_score=request.min_score)

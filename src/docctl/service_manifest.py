@@ -88,14 +88,14 @@ def catalog_documents(manifest_docs: dict[str, Any]) -> list[dict[str, Any]]:
     for doc_id, raw_details in sorted(manifest_docs.items()):
         if not isinstance(raw_details, dict):
             continue
-        pages = to_non_negative_int(raw_details.get("pages", 0))
+        units = to_non_negative_int(raw_details.get("units", 0))
         chunks = to_non_negative_int(raw_details.get("chunks", 0))
         documents.append(
             {
                 "doc_id": str(doc_id),
                 "source": str(raw_details.get("source", "")),
                 "title": str(raw_details.get("title", "")),
-                "pages": pages,
+                "units": units,
                 "chunks": chunks,
                 "last_ingest_at": raw_details.get("last_ingest_at"),
                 "content_hash": str(raw_details.get("content_hash", "")),

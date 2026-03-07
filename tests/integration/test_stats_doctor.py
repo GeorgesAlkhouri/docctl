@@ -80,7 +80,7 @@ def test_catalog_json_output(runner, make_pdf, patch_fake_embeddings, tmp_path: 
     assert payload["collection"] == "test"
     assert payload["summary"]["document_count"] == 2
     assert payload["summary"]["chunk_count"] >= 2
-    assert payload["summary"]["pages_total"] == 3
+    assert payload["summary"]["units_total"] == 3
     assert "last_ingest_at" in payload["summary"]
     assert len(payload["documents"]) == 2
 
@@ -89,7 +89,7 @@ def test_catalog_json_output(runner, make_pdf, patch_fake_embeddings, tmp_path: 
         "doc_id",
         "source",
         "title",
-        "pages",
+        "units",
         "chunks",
         "last_ingest_at",
         "content_hash",

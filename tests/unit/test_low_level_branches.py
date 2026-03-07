@@ -5,18 +5,17 @@ from pathlib import Path
 import pytest
 
 from docctl import chunking, embeddings, index_store, pdf_extract
-from docctl.errors import EmptyExtractedTextError, IndexNotInitializedError, PdfReadError
-from docctl.pdf_extract import PageText
+from docctl.errors import DocumentReadError, EmptyExtractedTextError, IndexNotInitializedError
+from docctl.models import TextUnit
 
 
-def test_chunk_document_pages_skips_empty_node_content(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_chunk_document_units_skips_empty_node_content(monkeypatch: pytest.MonkeyPatch) -> None:
     class _Node:
         def __init__(self, text: str) -> None:
             self.metadata = {
                 "doc_id": "doc",
                 "source": "src.pdf",
                 "title": "Title",
-                "page": 1,
             }
             self._text = text
 
@@ -33,11 +32,11 @@ def test_chunk_document_pages_skips_empty_node_content(monkeypatch: pytest.Monke
             return [_Node("   "), _Node("valid text")]
 
     monkeypatch.setattr(chunking, "SentenceSplitter", _Splitter)
-    records = chunking.chunk_document_pages(
+    records = chunking.chunk_document_units(
         doc_id="doc",
         source="src.pdf",
         title="Title",
-        pages=[PageText(page=1, text="seed")],
+        units=[TextUnit(text="seed")],
     )
 
     assert len(records) == 1
@@ -134,7 +133,7 @@ def test_extract_with_pdfplumber_wraps_unexpected_error(
 
     monkeypatch.setattr(pdf_extract.pdfplumber, "open", _boom)
 
-    with pytest.raises(PdfReadError):
+    with pytest.raises(DocumentReadError):
         pdf_extract._extract_with_pdfplumber(tmp_path / "sample.pdf")
 
 
@@ -150,8 +149,8 @@ def test_extract_with_pypdf_success(monkeypatch: pytest.MonkeyPatch, tmp_path: P
             self.pages = [_Page()]
 
     monkeypatch.setattr(pdf_extract, "PdfReader", _Reader)
-    pages = pdf_extract._extract_with_pypdf(tmp_path / "sample.pdf")
-    assert pages == [PageText(page=1, text="text")]
+    units = pdf_extract._extract_with_pypdf(tmp_path / "sample.pdf")
+    assert units == [TextUnit(text="text")]
 
 
 def test_extract_with_pypdf_wraps_unexpected_error(
@@ -164,36 +163,39 @@ def test_extract_with_pypdf_wraps_unexpected_error(
 
     monkeypatch.setattr(pdf_extract, "PdfReader", _Reader)
 
-    with pytest.raises(PdfReadError):
+    with pytest.raises(DocumentReadError):
         pdf_extract._extract_with_pypdf(tmp_path / "sample.pdf")
 
 
-def test_extract_pdf_pages_falls_back_to_pypdf(
+def test_extract_pdf_units_falls_back_to_pypdf(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setattr(
         pdf_extract,
         "_extract_with_pdfplumber",
-        lambda path: (_ for _ in ()).throw(PdfReadError(f"failed: {path}")),
+        lambda path: (_ for _ in ()).throw(DocumentReadError(f"failed: {path}")),
     )
     monkeypatch.setattr(
         pdf_extract,
         "_extract_with_pypdf",
-        lambda path: [PageText(page=1, text="fallback text")],
+        lambda path: [TextUnit(text="fallback text")],
     )
 
-    pages = pdf_extract.extract_pdf_pages(tmp_path / "sample.pdf")
-    assert pages == [PageText(page=1, text="fallback text")]
+    units = pdf_extract.extract_pdf_units(tmp_path / "sample.pdf")
+    assert units == [TextUnit(text="fallback text")]
 
 
-def test_extract_pdf_pages_raises_when_all_pages_empty(
+def test_extract_pdf_units_raises_when_all_pages_empty(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setattr(
         pdf_extract,
         "_extract_with_pdfplumber",
-        lambda path: [PageText(page=1, text=" \n "), PageText(page=2, text="\n\t")],
+        lambda path: [
+            TextUnit(text=" \n "),
+            TextUnit(text="\n\t"),
+        ],
     )
 
     with pytest.raises(EmptyExtractedTextError):
-        pdf_extract.extract_pdf_pages(tmp_path / "sample.pdf")
+        pdf_extract.extract_pdf_units(tmp_path / "sample.pdf")

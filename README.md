@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  Local-first CLI for ingesting PDFs and retrieving provenance-grounded answers
+  Local-first CLI for ingesting natural text documents and retrieving provenance-grounded answers
   with predictable machine-readable output.
 </p>
 
@@ -40,7 +40,7 @@
 
 ## Why docctl
 - Runs locally with a persistent Chroma-backed index.
-- Ingests PDFs with provenance metadata (`doc_id`, `source`, `title`, `page`).
+- Ingests `.pdf`, `.docx`, `.txt`, and `.md` with provenance metadata (`doc_id`, `source`, `title`).
 - Uses sentence-aware chunking for better retrieval quality.
 - Supports deterministic `--json` output for automation and agents.
 - Exposes stable CLI workflows for ingest, search, diagnostics, and inventory.
@@ -57,7 +57,7 @@ uv sync --frozen --dev
 # 2) Verify CLI
 uv run docctl --help
 
-# 3) Ingest PDFs (mutates local index)
+# 3) Ingest supported files (mutates local index)
 uv run docctl ingest ./docs --recursive --approve-write --allow-model-download
 
 # 4) Search indexed content
@@ -70,7 +70,7 @@ uv run docctl show <chunk_id_from_search> --allow-model-download
 ## Command Overview
 | Command | Purpose |
 |---|---|
-| `docctl ingest <path>` | Ingest one PDF or a directory of PDFs (mutates local index state). |
+| `docctl ingest <path>` | Ingest one supported file or a directory of supported files (mutates local index state). |
 | `docctl search <query>` | Search indexed content with optional metadata filters. |
 | `docctl show <chunk_id>` | Show one indexed chunk by exact id. |
 | `docctl stats` | Show index statistics. |
