@@ -25,6 +25,7 @@ description: "Agent skill for docctl multi-format ingestion and provenance-groun
 ## Inputs and assumptions
 - Expected inputs:
   - user question,
+  - user-preferred response language when observable from the conversation,
   - optional corpus path(s),
   - optional retrieval filters (`doc_id`, `source`, `title`),
   - optional index settings.
@@ -34,6 +35,12 @@ description: "Agent skill for docctl multi-format ingestion and provenance-groun
   - `--json` enabled for machine consumption.
 - Safety assumption:
   - `ingest` is mutating and should only run under explicit lifecycle conditions.
+- Language assumption:
+  - infer a working retrieval language from the strongest available signal in this order:
+    1. explicit user instruction,
+    2. language of the latest user turn,
+    3. language used by retrieved evidence or cited answers in the active workflow.
+  - if the user asks in one language but the evidence and grounded answer are clearly in another, switch query rewriting and follow-up searches to the evidence language while preserving the user's requested answer language unless they ask to change it.
 
 ## Operational workflow (ordered)
 1. Run readiness checks.
@@ -45,6 +52,8 @@ description: "Agent skill for docctl multi-format ingestion and provenance-groun
    - Reingest only on explicit user intent or stale corpus signals (file updates/new files).
 3. Prepare retrieval query in the agent layer.
    - Rewrite/expand/paraphrase outside `docctl` if needed.
+   - Choose the search language from the current working retrieval language, not only from the latest user wording.
+   - If the user asks in English but the relevant evidence and grounded answers are in German, reformulate the next retrieval attempts in German.
 4. Execute retrieval (session-first).
    - Primary: `docctl session` with `op:"search"` for iterative loops.
    - For two or more read operations in one workflow, open one `docctl session` and send multiple NDJSON requests in that session.
@@ -52,6 +61,7 @@ description: "Agent skill for docctl multi-format ingestion and provenance-groun
    - Secondary fallback: one-shot `docctl search`.
 5. Run bounded evidence expansion loop.
    - If no or weak results, broaden query and/or relax filters.
+   - If results indicate the corpus language differs from the current query language, retry in the corpus language before exhausting attempts.
    - Increase `top_k` per policy and retry up to max attempts.
 6. Inspect top evidence chunks.
    - Call `show` for selected chunk IDs before synthesis when precision matters.
@@ -102,12 +112,16 @@ description: "Agent skill for docctl multi-format ingestion and provenance-groun
   - ingest if allowed by lifecycle policy; otherwise return actionable instruction.
 - Tool or schema errors:
   - surface exact corrective action (for example invalid field type in session request).
+- Cross-language mismatch:
+  - if the question language and evidence language diverge, state that the search language was switched to match the indexed evidence and keep citations in the original evidence language.
 - No verifiable evidence after bounded retries:
   - return `cannot verify from indexed documents` and list missing information.
 
 ## Output contract for downstream agents
 Return a structured payload (or equivalent human-readable response) with:
 - `answer`: grounded response text.
+- `answer_language`: language used for the final answer.
+- `search_language`: language used for the final retrieval attempt.
 - `citations`: list of objects with:
   - `source`
   - `chunk_id`
