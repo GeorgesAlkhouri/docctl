@@ -7,8 +7,8 @@
 </p>
 
 <p align="center">
-  Local-first CLI for ingesting natural text documents and retrieving provenance-grounded answers
-  with predictable machine-readable output.
+  Local-first CLI for agent and human document retrieval with provenance-grounded answers,
+  local vector-store, and predictable machine-readable output.
 </p>
 
 <p align="center">
@@ -39,11 +39,16 @@
 </p>
 
 ## Why docctl
+- Optimized for agentic retrieval loops with fast multi-step questions and answers.
 - Runs locally with a persistent Chroma-backed index.
 - Ingests `.pdf`, `.docx`, `.txt`, and `.md` with provenance metadata (`doc_id`, `source`, `title`).
 - Uses sentence-aware chunking for better retrieval quality.
 - Supports deterministic `--json` output for automation and agents.
 - Exposes stable CLI workflows for ingest, search, diagnostics, and inventory.
+
+## Agent Integration
+Use [SKILL.md](SKILL.md) when you want an agent to drive `docctl` end-to-end.
+The skill makes `session` for fast iterative retrieval.
 
 ## Quickstart
 Requirements:
@@ -57,7 +62,7 @@ uv sync --frozen --dev
 # 2) Verify CLI
 uv run docctl --help
 
-# 3) Ingest supported files (mutates local index)
+# 3) Ingest supported files
 uv run docctl ingest ./docs --recursive --approve-write --allow-model-download
 
 # 4) Search indexed content
@@ -85,7 +90,7 @@ Use `--json` for deterministic machine-readable output:
 uv run docctl --json search "security gateway diagnostics" --top-k 5 --allow-model-download
 ```
 
-Use `session` for NDJSON request/response flows:
+Use `session` for NDJSON request/response flows. For agents, this is the preferred fast path whenever one workflow needs two or more read operations:
 
 ```bash
 cat <<'EOF' | uv run docctl session --allow-model-download
@@ -143,6 +148,3 @@ For implementation and validation workflow, start with:
 1. [AGENTS.md](AGENTS.md)
 2. [ARCHITECTURE.md](ARCHITECTURE.md)
 3. The indexed docs under `docs/` listed above.
-
-## Agent Integration (Optional)
-Agent implementers can use the repository skill in [SKILL.md](SKILL.md) for session-first retrieval and provenance-grounded workflows.
