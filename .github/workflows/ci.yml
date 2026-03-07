@@ -53,9 +53,15 @@ jobs:
         run: make SHELL=/bin/bash import-lint
 
   test:
-    name: Test suite (Python 3.13)
+    name: Test suite (Python ${{ matrix.python-version }})
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version:
+          - '3.12'
+          - '3.13'
 
     steps:
       - name: Checkout
@@ -64,7 +70,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: '3.13'
+          python-version: ${{ matrix.python-version }}
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
@@ -78,13 +84,15 @@ jobs:
         run: make SHELL=/bin/bash test-cov
 
       - name: Upload coverage artifact
+        if: matrix.python-version == '3.13'
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-xml
+          name: coverage-xml-3.13
           path: coverage.xml
           if-no-files-found: error
 
       - name: Upload coverage to Codecov
+        if: matrix.python-version == '3.13'
         uses: codecov/codecov-action@v5
         with:
           files: coverage.xml
@@ -109,7 +117,7 @@ jobs:
       - name: Download coverage artifact
         uses: actions/download-artifact@v4
         with:
-          name: coverage-xml
+          name: coverage-xml-3.13
 
       - name: Run SonarQube scan
         uses: SonarSource/sonarqube-scan-action@v7
