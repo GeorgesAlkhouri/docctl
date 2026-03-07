@@ -91,10 +91,7 @@ def extract_pdf_units(path: Path) -> list[TextUnit]:
     except DocumentReadError:
         extracted = _extract_with_pypdf(path)
 
-    normalized = [
-        TextUnit(text=_normalize_page_text(unit.text))
-        for unit in extracted
-    ]
+    normalized = [TextUnit(text=_normalize_page_text(unit.text)) for unit in extracted]
     normalized = _strip_repeating_headers_and_footers(normalized)
     non_empty_units = [unit for unit in normalized if unit.text.strip()]
 

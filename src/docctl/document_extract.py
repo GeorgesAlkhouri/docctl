@@ -34,11 +34,7 @@ def _split_paragraph_units(text: str) -> list[TextUnit]:
     if not normalized:
         return []
     paragraphs = [segment.strip() for segment in _PARAGRAPH_BREAK_RE.split(normalized)]
-    return [
-        TextUnit(text=paragraph)
-        for paragraph in paragraphs
-        if paragraph
-    ]
+    return [TextUnit(text=paragraph) for paragraph in paragraphs if paragraph]
 
 
 def _extract_docx_units(path: Path) -> list[TextUnit]:
