@@ -133,8 +133,9 @@ make format
 - [docs/design-docs/index.md](docs/design-docs/index.md)
 - [docs/product-specs/index.md](docs/product-specs/index.md)
 - [docs/references/index.md](docs/references/index.md)
+- [SECURITY.md](SECURITY.md) (canonical vulnerability disclosure policy)
 - [docs/RELIABILITY.md](docs/RELIABILITY.md)
-- [docs/SECURITY.md](docs/SECURITY.md)
+- [docs/SECURITY.md](docs/SECURITY.md) (internal implementation security guardrails)
 - [docs/PLANS.md](docs/PLANS.md)
 
 ## Contributing
