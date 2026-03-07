@@ -230,5 +230,41 @@ def test_session_catalog_operation(runner, make_pdf, patch_fake_embeddings, tmp_
     assert result["collection"] == "test"
     assert result["summary"]["document_count"] == 1
     assert result["summary"]["chunk_count"] >= 1
-    assert result["summary"]["pages_total"] == 2
+    assert result["summary"]["units_total"] == 2
     assert len(result["documents"]) == 1
+
+
+def test_session_search_ignores_unknown_extra_fields(
+    runner, make_pdf, patch_fake_embeddings, tmp_path: Path
+) -> None:
+    pdf_path = make_pdf(tmp_path / "doc.pdf", ["Session migration check text."])
+    index_path = tmp_path / "index"
+    ingest_result = runner.invoke(
+        app,
+        [
+            "--index-path",
+            str(index_path),
+            "--collection",
+            "test",
+            "--json",
+            "ingest",
+            str(pdf_path),
+        ],
+    )
+    assert ingest_result.exit_code == 0, ingest_result.output
+
+    request_lines = json.dumps(
+        {"id": "q1", "op": "search", "query": "migration", "ignored_field": 1, "top_k": 3}
+    )
+    session_result = runner.invoke(
+        app,
+        ["--index-path", str(index_path), "--collection", "test", "session"],
+        input=f"{request_lines}\n",
+    )
+    assert session_result.exit_code == 0, session_result.output
+
+    responses = [json.loads(line) for line in session_result.output.splitlines() if line.strip()]
+    assert len(responses) == 1
+    assert responses[0]["id"] == "q1"
+    assert responses[0]["ok"] is True
+    assert responses[0]["result"]["hits"]

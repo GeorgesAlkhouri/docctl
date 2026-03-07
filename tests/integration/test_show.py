@@ -51,4 +51,4 @@ def test_show_chunk_by_id(runner, make_pdf, patch_fake_embeddings, tmp_path: Pat
     assert show_payload["id"] == chunk_id
     assert "text" in show_payload
     assert "metadata" in show_payload
-    assert show_payload["metadata"]["page"] >= 1
+    assert {"doc_id", "source", "title"}.issubset(show_payload["metadata"].keys())

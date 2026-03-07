@@ -145,7 +145,14 @@ def test_search_json_output_sanitizes_control_chars(
             "ids": [["legacy"]],
             "documents": [["A\x00B\x1fC"]],
             "metadatas": [
-                [{"doc_id": "d", "source": "s", "title": "t", "page": 1, "section": None}]
+                [
+                    {
+                        "doc_id": "d",
+                        "source": "s",
+                        "title": "t",
+                        "section": None,
+                    }
+                ]
             ],
             "distances": [[0.0]],
         },
@@ -186,7 +193,12 @@ def test_show_json_output_sanitizes_control_chars(
         lambda self, chunk_id: ChunkRecord(
             id=chunk_id,
             text="X\x00Y\x1fZ",
-            metadata=ChunkMetadata(doc_id="d", source="s", title="t", page=1, section=None),
+            metadata=ChunkMetadata(
+                doc_id="d",
+                source="s",
+                title="t",
+                section=None,
+            ),
         ),
     )
 

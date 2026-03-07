@@ -24,10 +24,12 @@ Primary runtime code lives in `src/docctl/`.
   - Manifest and catalog serialization helpers.
 - `service_types.py`
   - Internal dataclasses/protocols for service request payloads and injected dependencies.
+- `document_extract.py`
+  - Multi-format extraction dispatcher for supported inputs (`.pdf`, `.docx`, `.txt`, `.md`).
 - `pdf_extract.py`
-  - PDF text extraction and text-normalization pipeline.
+  - PDF parser branch with fallback extraction and normalization.
 - `chunking.py`
-  - Sentence-aware chunk generation and metadata propagation.
+  - Sentence-aware chunk generation and shared metadata propagation.
 - `index_store.py`
   - Chroma persistence adapter and collection operations.
 - `embeddings.py`
@@ -38,7 +40,7 @@ Primary runtime code lives in `src/docctl/`.
 ## Dependency Direction
 Required dependency direction:
 1. Helper modules (`models`, `errors`, `config`, `jsonio`, `ids`) are foundational.
-2. Capability modules (`pdf_extract`, `chunking`, `index_store`, `embeddings`) depend on helpers.
+2. Capability modules (`document_extract`, `pdf_extract`, `chunking`, `index_store`, `embeddings`) depend on helpers.
 3. Service orchestration modules (`service_*`) compose helpers and capability modules.
 4. `services` is a compatibility façade over `service_*` modules.
 5. `cli` depends on `services` and shared contracts only.

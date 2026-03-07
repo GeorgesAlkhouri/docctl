@@ -97,7 +97,6 @@ class SearchRequest:
     doc_id: str | None
     source: str | None
     title: str | None
-    page: int | None
     min_score: float | None
     allow_model_download: bool
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from docx import Document
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from typer.testing import CliRunner
@@ -93,3 +94,16 @@ def make_pdf() -> callable:
         return path
 
     return _make_pdf
+
+
+@pytest.fixture()
+def make_docx() -> callable:
+    def _make_docx(path: Path, paragraphs: list[str]) -> Path:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        document = Document()
+        for paragraph in paragraphs:
+            document.add_paragraph(paragraph)
+        document.save(str(path))
+        return path
+
+    return _make_docx

@@ -1,4 +1,4 @@
-"""Ingest orchestration for PDF discovery and index mutation."""
+"""Ingest orchestration for document discovery and index mutation."""
 
 from __future__ import annotations
 
@@ -7,7 +7,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .chunking import chunk_document_pages
+from .chunking import chunk_document_units
+from .document_extract import extract_document_units, is_supported_ingest_file
 from .errors import (
     DocctlError,
     EmptyExtractedTextError,
@@ -15,7 +16,6 @@ from .errors import (
     WriteApprovalRequiredError,
 )
 from .ids import build_doc_id, file_sha256
-from .pdf_extract import extract_pdf_pages
 from .service_manifest import load_manifest, write_manifest
 from .service_types import IngestRequest, ServiceDependencies, Store
 
@@ -26,7 +26,7 @@ class _IngestState:
 
     indexed_files: int = 0
     skipped_files: int = 0
-    indexed_pages: int = 0
+    indexed_units: int = 0
     indexed_chunks: int = 0
     errors: list[dict[str, str]] = field(default_factory=list)
     first_docctl_error: DocctlError | None = None
@@ -51,7 +51,7 @@ def relative_source(path: Path) -> str:
     """Return source path relative to current working directory when possible.
 
     Args:
-        path: Input PDF path.
+        path: Input document path.
 
     Returns:
         Relative path when under cwd, otherwise absolute path.
@@ -62,34 +62,34 @@ def relative_source(path: Path) -> str:
         return str(path.resolve())
 
 
-def discover_pdf_files(*, input_path: Path, recursive: bool, glob_pattern: str) -> list[Path]:
-    """Discover PDF files from an input path.
+def discover_supported_files(*, input_path: Path, recursive: bool, glob_pattern: str) -> list[Path]:
+    """Discover supported files from an input path.
 
     Args:
-        input_path: PDF file or directory path.
+        input_path: Supported file or directory path.
         recursive: Whether directory traversal is recursive.
         glob_pattern: Glob pattern used for discovery.
 
     Returns:
-        Sorted list of resolved PDF paths.
+        Sorted list of resolved file paths.
 
     Raises:
-        InputPathNotFoundError: If path is invalid or no PDFs match.
+        InputPathNotFoundError: If path is invalid or no supported files match.
     """
     if not input_path.exists():
         raise InputPathNotFoundError(f"input path does not exist: {input_path}")
 
     if input_path.is_file():
-        if input_path.suffix.lower() != ".pdf":
-            raise InputPathNotFoundError(f"input file is not a PDF: {input_path}")
+        if not is_supported_ingest_file(input_path):
+            raise InputPathNotFoundError(f"unsupported ingest file type: {input_path}")
         return [input_path.resolve()]
 
     iterator = input_path.rglob(glob_pattern) if recursive else input_path.glob(glob_pattern)
     files = sorted(
-        path.resolve() for path in iterator if path.is_file() and path.suffix.lower() == ".pdf"
+        path.resolve() for path in iterator if path.is_file() and is_supported_ingest_file(path)
     )
     if not files:
-        raise InputPathNotFoundError(f"no PDF files matched under: {input_path}")
+        raise InputPathNotFoundError(f"no supported files matched under: {input_path}")
     return files
 
 
@@ -150,52 +150,52 @@ def _should_skip_existing(
 def _ingest_document(
     *, file_path: Path, context: _DocumentContext, store: Store
 ) -> tuple[int, int]:
-    """Extract, chunk, and index one PDF.
+    """Extract, chunk, and index one supported document.
 
     Args:
-        file_path: PDF path to ingest.
+        file_path: Document path to ingest.
         context: Per-file derived metadata context.
         store: Collection store adapter.
 
     Returns:
-        Tuple of `(pages_indexed, chunks_indexed)`.
+        Tuple of `(units_indexed, chunks_indexed)`.
 
     Raises:
         EmptyExtractedTextError: If no chunks were produced.
         Exception: Any extraction/chunking/storage failures.
     """
-    pages = extract_pdf_pages(file_path)
-    chunks = chunk_document_pages(
+    units = extract_document_units(file_path)
+    chunks = chunk_document_units(
         doc_id=context.doc_id,
         source=context.source,
         title=context.title,
-        pages=pages,
+        units=units,
     )
     if not chunks:
         raise EmptyExtractedTextError(f"no chunks produced for file: {file_path}")
 
     store.delete_by_doc_id(context.doc_id)
     store.upsert_chunks(chunks)
-    return len(pages), len(chunks)
+    return len(units), len(chunks)
 
 
-def _record_success(
+def _record_success(  # noqa: PLR0913 - explicit parameters keep ingest state updates readable.
     *,
     context: _DocumentContext,
-    pages_indexed: int,
+    units_indexed: int,
     chunks_indexed: int,
     manifest_docs: dict[str, Any],
     state: _IngestState,
 ) -> None:
     """Apply successful file ingest effects to counters and manifest."""
     state.indexed_files += 1
-    state.indexed_pages += pages_indexed
+    state.indexed_units += units_indexed
     state.indexed_chunks += chunks_indexed
     manifest_docs[context.doc_id] = {
         "source": context.source,
         "title": context.title,
         "content_hash": context.content_hash,
-        "pages": pages_indexed,
+        "units": units_indexed,
         "chunks": chunks_indexed,
         "last_ingest_at": utc_now_iso(),
     }
@@ -224,14 +224,14 @@ def _process_files(
             continue
 
         try:
-            pages_indexed, chunks_indexed = _ingest_document(
+            units_indexed, chunks_indexed = _ingest_document(
                 file_path=file_path,
                 context=context,
                 store=store,
             )
             _record_success(
                 context=context,
-                pages_indexed=pages_indexed,
+                units_indexed=units_indexed,
                 chunks_indexed=chunks_indexed,
                 manifest_docs=manifest_docs,
                 state=state,
@@ -276,13 +276,13 @@ def _summary_payload(
         "files_indexed": state.indexed_files,
         "files_skipped": state.skipped_files,
         "index_path": str(request.config.index_path),
-        "pages_indexed": state.indexed_pages,
+        "units_indexed": state.indexed_units,
         "chunks_indexed": state.indexed_chunks,
     }
 
 
 def ingest_path(*, request: IngestRequest, deps: ServiceDependencies) -> dict[str, object]:
-    """Ingest one PDF path or directory into the local vector index.
+    """Ingest one supported path or directory into the local vector index.
 
     Args:
         request: Ingest request payload.
@@ -295,7 +295,7 @@ def ingest_path(*, request: IngestRequest, deps: ServiceDependencies) -> dict[st
         require_approval=request.config.require_write_approval,
         approve_write=request.approve_write,
     )
-    files = discover_pdf_files(
+    files = discover_supported_files(
         input_path=request.input_path,
         recursive=request.recursive,
         glob_pattern=request.glob_pattern,

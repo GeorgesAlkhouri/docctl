@@ -23,8 +23,8 @@ class InputPathNotFoundError(DocctlError):
         super().__init__(message=message, exit_code=10)
 
 
-class PdfReadError(DocctlError):
-    """Raise when PDF bytes cannot be decoded into page text."""
+class DocumentReadError(DocctlError):
+    """Raise when document bytes cannot be decoded into extractable text units."""
 
     def __init__(self, message: str) -> None:
         super().__init__(message=message, exit_code=11)

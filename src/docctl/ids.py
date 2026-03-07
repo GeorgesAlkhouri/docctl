@@ -55,17 +55,20 @@ def build_doc_id(source: str) -> str:
     return f"{slugify(stem)}-{digest}"
 
 
-def build_chunk_id(doc_id: str, page: int, chunk_index: int, text: str) -> str:
+def build_chunk_id(
+    doc_id: str,
+    chunk_index: int,
+    text: str,
+) -> str:
     """Build a deterministic chunk id for one chunk within a document.
 
     Args:
         doc_id: Parent document id.
-        page: One-based PDF page number containing the chunk.
-        chunk_index: Zero-based chunk offset within the page.
+        chunk_index: One-based chunk offset within the document.
         text: Chunk text used to derive a collision-resistant suffix.
 
     Returns:
-        Structured chunk identifier with page, index, and digest components.
+        Structured chunk identifier with index and digest components.
     """
     digest = hashlib.sha1(text.encode("utf-8"), usedforsecurity=False).hexdigest()[:8]
-    return f"{doc_id}:p{page:04d}:c{chunk_index:04d}:{digest}"
+    return f"{doc_id}:c{chunk_index:04d}:{digest}"

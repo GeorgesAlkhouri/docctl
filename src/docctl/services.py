@@ -48,13 +48,13 @@ def ingest_path(  # noqa: PLR0913
     approve_write: bool,
     allow_model_download: bool,
 ) -> dict[str, object]:
-    """Ingest one PDF path or directory into the local vector index.
+    """Ingest one supported path or directory into the local vector index.
 
     Args:
         config: Resolved CLI configuration.
-        input_path: PDF file or directory to ingest.
+        input_path: Supported file or directory to ingest.
         recursive: Whether directory traversal is recursive.
-        glob_pattern: Glob used for PDF discovery in directories.
+        glob_pattern: Glob used for file discovery in directories.
         force: Whether existing documents should be reingested.
         approve_write: Explicit user approval for mutating writes.
         allow_model_download: Whether missing embedding models may be downloaded.
@@ -82,7 +82,6 @@ def search_chunks(  # noqa: PLR0913
     doc_id: str | None,
     source: str | None,
     title: str | None,
-    page: int | None,
     min_score: float | None,
     allow_model_download: bool,
 ) -> dict[str, object]:
@@ -95,7 +94,6 @@ def search_chunks(  # noqa: PLR0913
         doc_id: Optional document id filter.
         source: Optional source path filter.
         title: Optional document title filter.
-        page: Optional one-based page filter.
         min_score: Optional minimum similarity score in `[0.0, 1.0]`.
         allow_model_download: Whether missing embedding models may be downloaded.
 
@@ -109,7 +107,6 @@ def search_chunks(  # noqa: PLR0913
         doc_id=doc_id,
         source=source,
         title=title,
-        page=page,
         min_score=min_score,
         allow_model_download=allow_model_download,
     )
@@ -190,7 +187,7 @@ def collect_catalog(*, config: CliConfig) -> dict[str, object]:
         "summary": {
             "document_count": len(documents),
             "chunk_count": store.count(),
-            "pages_total": sum(document["pages"] for document in documents),
+            "units_total": sum(document["units"] for document in documents),
             "last_ingest_at": manifest.get("last_ingest_at"),
         },
         "documents": documents,

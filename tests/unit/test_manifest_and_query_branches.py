@@ -27,15 +27,47 @@ def test_manifest_documents_returns_empty_dict_for_non_mapping() -> None:
 def test_catalog_documents_skips_non_dict_entries() -> None:
     docs = {
         "a": "not-a-dict",
-        "b": {"source": "s.pdf", "title": "t", "pages": 1, "chunks": 2, "content_hash": "x"},
+        "b": {"source": "s.pdf", "title": "t", "units": 1, "chunks": 2, "content_hash": "x"},
     }
     catalog = catalog_documents(docs)
     assert len(catalog) == 1
     assert catalog[0]["doc_id"] == "b"
+    assert catalog[0]["source"] == "s.pdf"
+    assert catalog[0]["units"] == 1
+    assert catalog[0]["chunks"] == 2
+
+
+def test_catalog_documents_ignores_unknown_extra_fields() -> None:
+    docs = {
+        "a": {
+            "source": "notes.md",
+            "title": "n",
+            "units": 2,
+            "chunks": 2,
+            "content_hash": "x",
+            "legacy_modes": ["one", "two", "one"],
+        }
+    }
+    catalog = catalog_documents(docs)
+    assert "legacy_modes" not in catalog[0]
+
+
+def test_catalog_documents_sorts_and_preserves_base_fields() -> None:
+    docs = {
+        "a": {"source": "notes.md", "title": "n", "units": 1, "chunks": 1, "content_hash": "x"},
+        "b": {"source": "notes.bin", "title": "b", "units": 1, "chunks": 1, "content_hash": "y"},
+    }
+    catalog = catalog_documents(docs)
+    assert [row["doc_id"] for row in catalog] == ["a", "b"]
+    assert all("legacy_modes" not in row for row in catalog)
 
 
 def test_build_where_filter_supports_source_and_title_only() -> None:
-    where = build_where_filter(doc_id=None, source="source.pdf", title="manual", page=None)
+    where = build_where_filter(
+        doc_id=None,
+        source="source.pdf",
+        title="manual",
+    )
     assert where == {"$and": [{"source": "source.pdf"}, {"title": "manual"}]}
 
 
@@ -43,7 +75,15 @@ def test_search_hits_respects_min_score_threshold() -> None:
     result = {
         "ids": [["chunk-1"]],
         "documents": [["text"]],
-        "metadatas": [[{"doc_id": "d", "source": "s", "title": "t", "page": 1}]],
+        "metadatas": [
+            [
+                {
+                    "doc_id": "d",
+                    "source": "s",
+                    "title": "t",
+                }
+            ]
+        ],
         "distances": [[10.0]],
     }
     hits = search_hits_from_result(result=result, min_score=0.2)
