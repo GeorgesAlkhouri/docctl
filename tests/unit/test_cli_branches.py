@@ -124,6 +124,19 @@ def test_session_command_handles_runtime_exception(runner, monkeypatch: pytest.M
     assert "session failed" in result.output
 
 
+def test_search_command_rejects_rerank_candidates_below_top_k(
+    runner, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(cli, "search_chunks", lambda **kwargs: {"hits": []})
+
+    result = runner.invoke(
+        cli.app,
+        ["search", "query", "--top-k", "5", "--rerank", "--rerank-candidates", "4"],
+    )
+    assert result.exit_code == 50
+    assert "invalid rerank candidate count" in result.output
+
+
 def test_main_invokes_typer_app(monkeypatch: pytest.MonkeyPatch) -> None:
     calls = {"count": 0}
 

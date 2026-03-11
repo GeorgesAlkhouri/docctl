@@ -18,6 +18,10 @@ Curated authoritative sources used for implementation and operations decisions.
 | REF-0012 | python-semantic-release Documentation | primary project documentation | active | conventional commit parsing and GitHub release automation |
 | REF-0013 | Conventional Commits 1.0.0 | standards body / specification | active | commit message contract for semantic version derivation |
 | REF-0014 | Hugging Face Model Card: jinaai/jina-embeddings-v5-text-small-retrieval | primary project documentation | active | default embedding model license caveat |
+| REF-0015 | Sentence Transformers Documentation | primary project documentation | active | retrieve-rerank pattern and CrossEncoder usage |
+| REF-0016 | Hugging Face Model Card: BAAI/bge-reranker-v2-m3 | primary project documentation | active | reranker model behavior and license |
+| REF-0017 | Chroma Query & Get Documentation | official vendor documentation | active | local collection query semantics |
+| REF-0018 | ChromaDB Go Client Rerankers | primary project documentation | active | confirms client-side rerank pattern, not python runtime contract |
 
 ## Source Quality Rule
 Use authoritative, professional sources (official vendor documentation,

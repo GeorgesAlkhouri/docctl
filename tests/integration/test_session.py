@@ -268,3 +268,95 @@ def test_session_search_ignores_unknown_extra_fields(
     assert responses[0]["id"] == "q1"
     assert responses[0]["ok"] is True
     assert responses[0]["result"]["hits"]
+
+
+def test_session_search_with_rerank_adds_fields(
+    runner,
+    make_pdf,
+    patch_fake_embeddings,
+    patch_fake_reranker,
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    pdf_path = make_pdf(tmp_path / "doc.pdf", ["Session rerank check text."])
+    index_path = tmp_path / "index"
+    ingest_result = runner.invoke(
+        app,
+        [
+            "--index-path",
+            str(index_path),
+            "--collection",
+            "test",
+            "--json",
+            "ingest",
+            str(pdf_path),
+        ],
+    )
+    assert ingest_result.exit_code == 0, ingest_result.output
+
+    monkeypatch.setattr("docctl.index_store.ChromaStore.count", lambda self: 1)
+    monkeypatch.setattr(
+        "docctl.index_store.ChromaStore.query",
+        lambda self, query, top_k, where=None: {
+            "ids": [["a", "b"]],
+            "documents": [["short", "this is a longer passage"]],
+            "metadatas": [
+                [
+                    {"doc_id": "d", "source": "s", "title": "ta"},
+                    {"doc_id": "d", "source": "s", "title": "tb"},
+                ]
+            ],
+            "distances": [[0.0, 0.1]],
+        },
+    )
+
+    request_line = json.dumps(
+        {
+            "id": "q1",
+            "op": "search",
+            "query": "anything",
+            "top_k": 2,
+            "rerank": True,
+        }
+    )
+    session_result = runner.invoke(
+        app,
+        ["--index-path", str(index_path), "--collection", "test", "session"],
+        input=f"{request_line}\n",
+    )
+    assert session_result.exit_code == 0, session_result.output
+    responses = [json.loads(line) for line in session_result.output.splitlines() if line.strip()]
+    assert len(responses) == 1
+    assert responses[0]["ok"] is True
+    hits = responses[0]["result"]["hits"]
+    assert [hit["id"] for hit in hits] == ["b", "a"]
+    assert all("vector_rank" in hit for hit in hits)
+    assert all("rerank_score" in hit for hit in hits)
+
+
+def test_session_search_rejects_rerank_candidates_below_top_k(
+    runner, tmp_path: Path
+) -> None:
+    index_path = tmp_path / "index"
+    request_lines = json.dumps(
+        {
+            "id": "q1",
+            "op": "search",
+            "query": "q",
+            "top_k": 5,
+            "rerank": True,
+            "rerank_candidates": 4,
+        }
+    )
+
+    session_result = runner.invoke(
+        app,
+        ["--index-path", str(index_path), "--collection", "test", "session"],
+        input=f"{request_lines}\n",
+    )
+    assert session_result.exit_code == 0, session_result.output
+    responses = [json.loads(line) for line in session_result.output.splitlines() if line.strip()]
+    assert len(responses) == 1
+    assert responses[0]["ok"] is False
+    assert responses[0]["error"]["exit_code"] == 50
+    assert responses[0]["error"]["message"] == "invalid session request field 'rerank_candidates'"

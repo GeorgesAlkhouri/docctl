@@ -21,8 +21,14 @@ evaluation hygiene clear for future tuning workflows.
 5. For each language/model pair:
    - rebuild isolated index,
    - ingest corpus once using benchmark-configured chunking,
-   - run all benchmark queries in one `docctl session`,
+   - run all benchmark queries in one `docctl session` for each selected ranking mode,
    - compute metrics on `test` queries.
+
+## Ranking Matrix
+- Default benchmark mode is `vector_only` (no rerank).
+- Optional rerank mode (`--rerank`) runs second-stage reranking.
+- Optional matrix mode (`--rerank-matrix`) evaluates both `vector_only` and `rerank`
+  for each language/model pair in one benchmark run so results are directly comparable.
 
 ## Model Matrix
 - `paraphrase-multilingual-MiniLM-L12-v2`

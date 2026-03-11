@@ -118,3 +118,66 @@ def test_search_supports_title_filter(
 
     assert len(title_payload["hits"]) >= 1
     assert all(hit["metadata"]["title"] == "alpha-manual" for hit in title_payload["hits"])
+
+
+def test_search_rerank_adds_fields_and_reorders_hits(
+    runner,
+    make_pdf,
+    patch_fake_embeddings,
+    patch_fake_reranker,
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    pdf_path = make_pdf(tmp_path / "doc.pdf", ["Baseline text for index initialization."])
+    index_path = tmp_path / "index"
+    ingest_result = runner.invoke(
+        app,
+        [
+            "--index-path",
+            str(index_path),
+            "--collection",
+            "test",
+            "--json",
+            "ingest",
+            str(pdf_path),
+        ],
+    )
+    assert ingest_result.exit_code == 0, ingest_result.output
+
+    monkeypatch.setattr("docctl.index_store.ChromaStore.count", lambda self: 1)
+    monkeypatch.setattr(
+        "docctl.index_store.ChromaStore.query",
+        lambda self, query, top_k, where=None: {
+            "ids": [["a", "b"]],
+            "documents": [["short", "this is a longer passage"]],
+            "metadatas": [
+                [
+                    {"doc_id": "d", "source": "s", "title": "ta"},
+                    {"doc_id": "d", "source": "s", "title": "tb"},
+                ]
+            ],
+            "distances": [[0.0, 0.1]],
+        },
+    )
+
+    search_result = runner.invoke(
+        app,
+        [
+            "--index-path",
+            str(index_path),
+            "--collection",
+            "test",
+            "--json",
+            "search",
+            "anything",
+            "--top-k",
+            "2",
+            "--rerank",
+        ],
+    )
+    assert search_result.exit_code == 0, search_result.output
+    payload = _json(search_result.output)
+
+    assert [hit["id"] for hit in payload["hits"]] == ["b", "a"]
+    assert all("vector_rank" in hit for hit in payload["hits"])
+    assert all("rerank_score" in hit for hit in payload["hits"])

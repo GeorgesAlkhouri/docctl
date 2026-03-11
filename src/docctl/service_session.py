@@ -11,12 +11,17 @@ from typing import Any
 
 from chromadb.api.types import Documents, EmbeddingFunction
 
-from .coerce import parse_optional_float, parse_optional_str
+from .coerce import (
+    parse_optional_bool,
+    parse_optional_float,
+    parse_optional_int,
+    parse_optional_str,
+)
 from .errors import DocctlError, EmptyIndexSearchError, InternalDocctlError
 from .service_doctor import run_doctor
 from .service_manifest import catalog_documents, load_manifest, manifest_documents
-from .service_query import build_where_filter, chunk_record_to_dict, search_hits_from_result
-from .service_types import DoctorRequest, ServiceDependencies, SessionStreamRequest, Store
+from .service_query import build_where_filter, chunk_record_to_dict, search_hits
+from .service_types import DoctorRequest, Reranker, ServiceDependencies, SessionStreamRequest, Store
 
 
 @dataclass(slots=True, frozen=True)
@@ -29,6 +34,8 @@ class _SessionSearchRequest:
     source: str | None
     title: str | None
     min_score: float | None
+    rerank: bool = False
+    rerank_candidates: int | None = None
 
 
 @contextmanager
@@ -65,6 +72,7 @@ class SessionRuntime:
         self._embedding_fn: EmbeddingFunction[Documents] | None = None
         self._search_store: Store | None = None
         self._readonly_store: Store | None = None
+        self._reranker: Reranker | None = None
 
     def _get_embedding_fn(self) -> EmbeddingFunction[Documents]:
         """Return cached embedding function for session search requests."""
@@ -100,6 +108,19 @@ class SessionRuntime:
             )
         return self._readonly_store
 
+    def _get_reranker(self) -> Reranker:
+        """Return cached reranker for session search requests."""
+        if self._reranker is None:
+            reranker_factory = self._deps.reranker_factory
+            if reranker_factory is None:
+                raise InternalDocctlError("reranker factory is not configured")
+            self._reranker = reranker_factory(
+                model_name=self._request.config.rerank_model,
+                allow_download=self._request.allow_model_download,
+                verbose=self._request.config.verbose,
+            )
+        return self._reranker
+
     def search(self, *, request: _SessionSearchRequest) -> dict[str, object]:
         """Execute a session search operation.
 
@@ -120,8 +141,25 @@ class SessionRuntime:
             source=request.source,
             title=request.title,
         )
-        result = store.query(query=request.query, top_k=request.top_k, where=where)
-        hits = search_hits_from_result(result=result, min_score=request.min_score)
+        session_deps = self._deps
+        if request.rerank:
+            session_deps = ServiceDependencies(
+                embedding_factory=self._deps.embedding_factory,
+                store_factory=self._deps.store_factory,
+                reranker_factory=lambda **_: self._get_reranker(),
+            )
+        hits = search_hits(
+            store=store,
+            query=request.query,
+            top_k=request.top_k,
+            where=where,
+            min_score=request.min_score,
+            rerank=request.rerank,
+            rerank_candidates=request.rerank_candidates,
+            config=self._request.config,
+            allow_model_download=self._request.allow_model_download,
+            deps=session_deps,
+        )
         return {
             "collection": self._request.config.collection,
             "hits": hits,
@@ -272,6 +310,17 @@ def _handle_search(runtime: SessionRuntime, payload: dict[str, Any]) -> dict[str
     if not isinstance(top_k_value, int) or top_k_value < 1 or top_k_value > 100:
         raise DocctlError(message="invalid session request field 'top_k'", exit_code=50)
 
+    rerank_value = parse_optional_bool(payload.get("rerank"), field_name="rerank")
+    rerank_enabled = rerank_value if rerank_value is not None else False
+    rerank_candidates_value = parse_optional_int(
+        payload.get("rerank_candidates"),
+        field_name="rerank_candidates",
+        minimum=1,
+        maximum=100,
+    )
+    if rerank_candidates_value is not None and rerank_candidates_value < top_k_value:
+        raise DocctlError(message="invalid session request field 'rerank_candidates'", exit_code=50)
+
     search_request = _SessionSearchRequest(
         query=query,
         top_k=top_k_value,
@@ -284,6 +333,8 @@ def _handle_search(runtime: SessionRuntime, payload: dict[str, Any]) -> dict[str
             minimum=0.0,
             maximum=1.0,
         ),
+        rerank=rerank_enabled,
+        rerank_candidates=rerank_candidates_value,
     )
     return runtime.search(request=search_request)
 

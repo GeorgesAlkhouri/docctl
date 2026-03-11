@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import pytest
 
 from docctl.coerce import (
+    parse_optional_bool,
     parse_optional_float,
     parse_optional_int,
     to_int,
@@ -50,6 +51,15 @@ def test_parse_optional_float_validates_type_and_bounds() -> None:
         parse_optional_float(-0.1, field_name="score", minimum=0.0)
     with pytest.raises(DocctlError):
         parse_optional_float(1.1, field_name="score", maximum=1.0)
+
+
+def test_parse_optional_bool_validates_type() -> None:
+    assert parse_optional_bool(None, field_name="rerank") is None
+    assert parse_optional_bool(True, field_name="rerank") is True
+    assert parse_optional_bool(False, field_name="rerank") is False
+
+    with pytest.raises(DocctlError):
+        parse_optional_bool("true", field_name="rerank")
 
 
 def test_dumps_json_serializes_dataclass_payloads() -> None:

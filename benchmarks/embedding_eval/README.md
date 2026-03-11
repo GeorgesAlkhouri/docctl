@@ -29,6 +29,18 @@ Common smoke run:
 uv run --with datasets python benchmarks/embedding_eval/run_xquad_benchmark.py --queries-per-lang 10
 ```
 
+Rerank smoke run:
+
+```bash
+uv run --with datasets python benchmarks/embedding_eval/run_xquad_benchmark.py --queries-per-lang 10 --rerank --rerank-model jinaai/jina-reranker-v2-base-multilingual
+```
+
+Comparable matrix smoke run (baseline + rerank in one report):
+
+```bash
+uv run --with datasets python benchmarks/embedding_eval/run_xquad_benchmark.py --queries-per-lang 10 --rerank-matrix --rerank-model jinaai/jina-reranker-v2-base-multilingual
+```
+
 ## Outputs
 - Machine artifacts (gitignored):
   - `benchmarks/embedding_eval/.work/query_manifest.json`

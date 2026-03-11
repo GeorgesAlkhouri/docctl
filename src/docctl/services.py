@@ -10,6 +10,7 @@ from .config import CliConfig
 from .embeddings import create_embedding_function
 from .index_store import ChromaStore
 from .models import DoctorReport
+from .reranking import create_reranker
 from .service_doctor import run_doctor as run_doctor_impl
 from .service_ingest import ingest_path as ingest_path_impl
 from .service_manifest import catalog_documents, load_manifest, manifest_documents
@@ -35,6 +36,7 @@ def _dependencies() -> ServiceDependencies:
     return ServiceDependencies(
         embedding_factory=create_embedding_function,
         store_factory=ChromaStore,
+        reranker_factory=create_reranker,
     )
 
 
@@ -83,6 +85,8 @@ def search_chunks(  # noqa: PLR0913
     source: str | None,
     title: str | None,
     min_score: float | None,
+    rerank: bool,
+    rerank_candidates: int | None,
     allow_model_download: bool,
 ) -> dict[str, object]:
     """Search indexed chunks with optional metadata filters.
@@ -95,6 +99,8 @@ def search_chunks(  # noqa: PLR0913
         source: Optional source path filter.
         title: Optional document title filter.
         min_score: Optional minimum similarity score in `[0.0, 1.0]`.
+        rerank: Whether second-stage reranking is enabled.
+        rerank_candidates: Candidate depth used before reranking.
         allow_model_download: Whether missing embedding models may be downloaded.
 
     Returns:
@@ -109,6 +115,8 @@ def search_chunks(  # noqa: PLR0913
         title=title,
         min_score=min_score,
         allow_model_download=allow_model_download,
+        rerank=rerank,
+        rerank_candidates=rerank_candidates,
     )
     return search_chunks_impl(request=request, deps=_dependencies())
 

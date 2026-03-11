@@ -6,9 +6,15 @@ from typing import Any
 import pytest
 
 from docctl.config import CliConfig
-from docctl.errors import ChunkNotFoundError
+from docctl.errors import ChunkNotFoundError, DocctlError
 from docctl.service_manifest import catalog_documents, load_manifest, manifest_documents
-from docctl.service_query import build_where_filter, search_hits_from_result, show_chunk
+from docctl.service_query import (
+    build_where_filter,
+    rerank_hits,
+    resolve_rerank_candidate_count,
+    search_hits_from_result,
+    show_chunk,
+)
 from docctl.service_types import ServiceDependencies, ShowRequest
 
 
@@ -88,6 +94,48 @@ def test_search_hits_respects_min_score_threshold() -> None:
     }
     hits = search_hits_from_result(result=result, min_score=0.2)
     assert hits == []
+
+
+def test_resolve_rerank_candidate_count_defaults_and_bounds() -> None:
+    assert resolve_rerank_candidate_count(top_k=5, rerank_candidates=None) == 20
+    assert resolve_rerank_candidate_count(top_k=30, rerank_candidates=None) == 100
+    assert resolve_rerank_candidate_count(top_k=5, rerank_candidates=7) == 7
+
+    with pytest.raises(DocctlError):
+        resolve_rerank_candidate_count(top_k=5, rerank_candidates=4)
+
+
+def test_rerank_hits_adds_metadata_and_sorts_by_rerank_score(tmp_path: Path) -> None:
+    class _Reranker:
+        def score(self, *, query: str, texts: list[str]) -> list[float]:
+            _ = query
+            return [0.1, 0.9, 0.9][: len(texts)]
+
+    deps = ServiceDependencies(
+        embedding_factory=lambda **kwargs: object(),
+        store_factory=lambda **kwargs: object(),
+        reranker_factory=lambda **kwargs: _Reranker(),
+    )
+    config = CliConfig(index_path=tmp_path, collection="c", embedding_model="m", rerank_model="r")
+    hits = [
+        {"rank": 1, "id": "a", "text": "A", "distance": 0.1, "score": 0.9, "metadata": {}},
+        {"rank": 2, "id": "b", "text": "B", "distance": 0.2, "score": 0.8, "metadata": {}},
+        {"rank": 3, "id": "c", "text": "C", "distance": 0.3, "score": 0.7, "metadata": {}},
+    ]
+
+    reranked = rerank_hits(
+        hits=hits,
+        query="query",
+        top_k=2,
+        config=config,
+        allow_model_download=False,
+        deps=deps,
+    )
+
+    assert [hit["id"] for hit in reranked] == ["b", "c"]
+    assert [hit["rank"] for hit in reranked] == [1, 2]
+    assert [hit["vector_rank"] for hit in reranked] == [2, 3]
+    assert all("rerank_score" in hit for hit in reranked)
 
 
 def test_show_chunk_raises_when_store_returns_none(tmp_path: Path) -> None:

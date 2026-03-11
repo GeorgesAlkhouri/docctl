@@ -34,6 +34,8 @@ Primary runtime code lives in `src/docctl/`.
   - Chroma persistence adapter and collection operations.
 - `embeddings.py`
   - Embedding model initialization and vector generation boundary.
+- `reranking.py`
+  - Optional second-stage cross-encoder reranking boundary used by search/session.
 - `models.py`, `errors.py`, `config.py`, `jsonio.py`, `ids.py`
   - Shared data contracts, stable errors, configuration defaults, deterministic JSON, and IDs.
 
