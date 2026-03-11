@@ -37,6 +37,9 @@ This repository is agent-first and documentation-indexed for `docctl`.
   corresponding config file(s) in the same change set.
 - Internal markdown links MUST pass `make check-markdown-links` before completion.
 - Broken, stale, or contradictory docs are defects and MUST be corrected in follow-up work.
+- Final implementation handoff messages MUST include a git diff distribution
+  report that counts source code changes, source code test changes, and
+  documentation changes.
 
 ## Root Coding Rules
 ### Bounded Validate Loop Policy
