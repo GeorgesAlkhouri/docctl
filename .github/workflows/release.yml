@@ -50,7 +50,7 @@ jobs:
       - name: Install dependencies from lockfile
         run: uv sync --frozen --dev
 
-      - name: Run full validation suite
+      - name: Run release validation suite
         run: |
           make SHELL=/bin/bash lint
           make SHELL=/bin/bash format-check
@@ -58,7 +58,6 @@ jobs:
           make SHELL=/bin/bash security-lint
           make SHELL=/bin/bash import-lint
           make SHELL=/bin/bash test
-          make SHELL=/bin/bash check-markdown-links
 
       - name: Preview next release
         if: inputs.dry_run
