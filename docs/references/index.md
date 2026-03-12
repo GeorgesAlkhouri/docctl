@@ -12,6 +12,12 @@ Curated authoritative sources used for implementation and operations decisions.
 | REF-0006 | Bandit Documentation | primary project documentation | active | proposed security linting checks |
 | REF-0007 | import-linter Documentation | primary project documentation | active | proposed architecture boundary checks |
 | REF-0008 | Google Python Style Guide (Docstrings) | primary project documentation | active | Google-style docstring structure and quality guidance |
+| REF-0009 | PyPA Packaging Guide: Publishing package distribution releases using GitHub Actions CI/CD workflows | primary project documentation | active | trusted publishing workflow split and environment guidance |
+| REF-0010 | PyPI Trusted Publishers: Creating a project through OIDC | official vendor documentation | active | pending publisher registration and first-publish behavior |
+| REF-0011 | uv Documentation: Projects and build configuration | primary project documentation | active | explicit build-system behavior and uv package builds |
+| REF-0012 | python-semantic-release Documentation | primary project documentation | active | conventional commit parsing and GitHub release automation |
+| REF-0013 | Conventional Commits 1.0.0 | standards body / specification | active | commit message contract for semantic version derivation |
+| REF-0014 | Hugging Face Model Card: jinaai/jina-embeddings-v5-text-small-retrieval | primary project documentation | active | default embedding model license caveat |
 
 ## Source Quality Rule
 Use authoritative, professional sources (official vendor documentation,

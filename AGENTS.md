@@ -55,6 +55,9 @@ This repository is agent-first and documentation-indexed for `docctl`.
 - If checks pass, MAY perform behavior-preserving refactors; MUST rerun checks
   after refactors.
 - Python test framework in this repository is `pytest`.
+- Commits intended for `main` MUST use the Conventional Commits format
+  (`type(scope): summary` or `type: summary`) so semantic-release can derive
+  versions and changelog entries deterministically.
 - All programming artifacts MUST be in English: identifiers, modules, classes,
   functions, comments, log/error messages, CLI flags, and JSON keys.
 

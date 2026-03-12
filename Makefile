@@ -1,7 +1,7 @@
 SHELL := /bin/zsh
 UV ?= uv
 
-.PHONY: sync test test-cov lint lint-preview typecheck typecheck-changed security-lint import-lint format format-check check-markdown-links help
+.PHONY: sync test test-cov lint lint-preview typecheck typecheck-changed security-lint import-lint format format-check build-dist check-dist release-dry-run check-markdown-links help
 
 help:
 	@echo "Targets:"
@@ -16,6 +16,9 @@ help:
 	@echo "  make format-check - verify ruff formatting"
 	@echo "  make test  - run unit, integration and acceptance tests"
 	@echo "  make test-cov - run tests and write coverage report to coverage.xml"
+	@echo "  make build-dist - build sdist and wheel into dist/"
+	@echo "  make check-dist - verify built distributions with twine"
+	@echo "  make release-dry-run - preview the next semantic-release version"
 	@echo "  make check-markdown-links - validate markdown links with lychee"
 
 sync:
@@ -53,6 +56,15 @@ test:
 
 test-cov:
 	$(UV) run pytest tests/unit tests/integration tests/acceptance -q --cov=src/docctl --cov-report=term --cov-report=xml:coverage.xml
+
+build-dist:
+	$(UV) build
+
+check-dist:
+	$(UV) run twine check dist/*
+
+release-dry-run:
+	$(UV) run semantic-release --strict --noop version --print
 
 check-markdown-links:
 	@./scripts/check-markdown-links.sh
