@@ -176,7 +176,7 @@ def parse_args() -> argparse.Namespace:  # noqa: C901, PLR0915
     parser.add_argument(
         "--rerank",
         action=argparse.BooleanOptionalAction,
-        default=False,
+        default=True,
         help="Enable second-stage reranking in session search requests.",
     )
     parser.add_argument(
