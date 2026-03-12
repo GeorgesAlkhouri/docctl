@@ -1,0 +1,69 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Preview the next semantic-release version without creating a release"
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  cut-release:
+    name: Cut release from main
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
+      GIT_COMMIT_AUTHOR: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git author
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install dependencies from lockfile
+        run: uv sync --frozen --dev
+
+      - name: Run full validation suite
+        run: |
+          make SHELL=/bin/bash lint
+          make SHELL=/bin/bash format-check
+          make SHELL=/bin/bash typecheck
+          make SHELL=/bin/bash security-lint
+          make SHELL=/bin/bash import-lint
+          make SHELL=/bin/bash test
+          make SHELL=/bin/bash check-markdown-links
+
+      - name: Preview next release
+        if: inputs.dry_run
+        run: uv run semantic-release --strict --noop version --print
+
+      - name: Create release commit, tag, and GitHub Release
+        if: ${{ !inputs.dry_run }}
+        run: uv run semantic-release --strict -v version

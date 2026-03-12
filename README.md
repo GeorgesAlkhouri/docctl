@@ -1,8 +1,8 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/docctl_logo_dark.png" />
-    <source media="(prefers-color-scheme: light)" srcset="docs/assets/docctl_logo_light.png" />
-    <img alt="docctl logo" src="docs/assets/docctl_logo_light.png" width="560" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/GeorgesAlkhouri/docctl/main/docs/assets/docctl_logo_dark.png" />
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/GeorgesAlkhouri/docctl/main/docs/assets/docctl_logo_light.png" />
+    <img alt="docctl logo" src="https://raw.githubusercontent.com/GeorgesAlkhouri/docctl/main/docs/assets/docctl_logo_light.png" width="560" />
   </picture>
 </p>
 
@@ -12,10 +12,10 @@
 </p>
 
 <p align="center">
-  <a href=".github/workflows/ci.yml">
+  <a href="https://github.com/GeorgesAlkhouri/docctl/actions/workflows/ci.yml">
     <img alt="CI" src="https://img.shields.io/github/actions/workflow/status/GeorgesAlkhouri/docctl/ci.yml?branch=main&style=for-the-badge&label=ci&logo=githubactions&logoColor=white" />
   </a>
-  <a href=".github/workflows/security-trivy.yml">
+  <a href="https://github.com/GeorgesAlkhouri/docctl/actions/workflows/security-trivy.yml">
     <img alt="Trivy" src="https://img.shields.io/github/actions/workflow/status/GeorgesAlkhouri/docctl/security-trivy.yml?branch=main&style=for-the-badge&label=trivy&logo=githubactions&logoColor=white" />
   </a>
   <a href="https://sonarcloud.io/summary/new_code?id=GeorgesAlkhouri_docctl">
@@ -47,7 +47,7 @@
 - Exposes stable CLI workflows for ingest, search, diagnostics, and inventory.
 
 ## Agent Integration
-Use [SKILL.md](SKILL.md) when you want an agent to drive `docctl` end-to-end.
+Use [SKILL.md](https://github.com/GeorgesAlkhouri/docctl/blob/main/SKILL.md) when you want an agent to drive `docctl` end-to-end.
 The skill makes `session` for fast iterative retrieval.
 
 ## Quickstart
@@ -70,6 +70,12 @@ uv run docctl search "security gateway diagnostics" --top-k 5 --allow-model-down
 
 # 5) Show one chunk by id (replace with an id from search output)
 uv run docctl show <chunk_id_from_search> --allow-model-download
+```
+
+After the first public release, install from PyPI with:
+
+```bash
+pip install docctl
 ```
 
 ## Command Overview
@@ -133,18 +139,34 @@ Apply formatting fixes:
 make format
 ```
 
+Build release artifacts locally:
+
+```bash
+make build-dist
+make check-dist
+make release-dry-run
+```
+
+## Release Automation
+- Releases are cut from the manual GitHub Actions workflow at `Actions -> Release`.
+- Commit messages intended for `main` must follow Conventional Commits so `python-semantic-release` can derive version bumps and changelog entries.
+- Publishing is split across two workflows:
+  - `release.yml` creates the release commit, tag, and GitHub Release.
+  - `publish-pypi.yml` builds from the release tag, publishes to TestPyPI, then publishes to PyPI through Trusted Publishing.
+- The package is MIT-licensed, but runtime-downloaded model assets can carry different licenses. The current default embedding model, `jinaai/jina-embeddings-v5-text-small-retrieval`, is documented separately from the package license.
+
 ## Documentation Map
-- [ARCHITECTURE.md](ARCHITECTURE.md)
-- [docs/design-docs/index.md](docs/design-docs/index.md)
-- [docs/product-specs/index.md](docs/product-specs/index.md)
-- [docs/references/index.md](docs/references/index.md)
-- [SECURITY.md](SECURITY.md) (canonical vulnerability disclosure policy)
-- [docs/RELIABILITY.md](docs/RELIABILITY.md)
-- [docs/SECURITY.md](docs/SECURITY.md) (internal implementation security guardrails)
-- [docs/PLANS.md](docs/PLANS.md)
+- [ARCHITECTURE.md](https://github.com/GeorgesAlkhouri/docctl/blob/main/ARCHITECTURE.md)
+- [docs/design-docs/index.md](https://github.com/GeorgesAlkhouri/docctl/blob/main/docs/design-docs/index.md)
+- [docs/product-specs/index.md](https://github.com/GeorgesAlkhouri/docctl/blob/main/docs/product-specs/index.md)
+- [docs/references/index.md](https://github.com/GeorgesAlkhouri/docctl/blob/main/docs/references/index.md)
+- [SECURITY.md](https://github.com/GeorgesAlkhouri/docctl/blob/main/SECURITY.md) (canonical vulnerability disclosure policy)
+- [docs/RELIABILITY.md](https://github.com/GeorgesAlkhouri/docctl/blob/main/docs/RELIABILITY.md)
+- [docs/SECURITY.md](https://github.com/GeorgesAlkhouri/docctl/blob/main/docs/SECURITY.md) (internal implementation security guardrails)
+- [docs/PLANS.md](https://github.com/GeorgesAlkhouri/docctl/blob/main/docs/PLANS.md)
 
 ## Contributing
 For implementation and validation workflow, start with:
-1. [AGENTS.md](AGENTS.md)
-2. [ARCHITECTURE.md](ARCHITECTURE.md)
+1. [AGENTS.md](https://github.com/GeorgesAlkhouri/docctl/blob/main/AGENTS.md)
+2. [ARCHITECTURE.md](https://github.com/GeorgesAlkhouri/docctl/blob/main/ARCHITECTURE.md)
 3. The indexed docs under `docs/` listed above.
