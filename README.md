@@ -147,14 +147,6 @@ make check-dist
 make release-dry-run
 ```
 
-## Release Automation
-- Releases are cut from the manual GitHub Actions workflow at `Actions -> Release`.
-- Commit messages intended for `main` must follow Conventional Commits so `python-semantic-release` can derive version bumps and changelog entries.
-- Publishing is split across two workflows:
-  - `release.yml` creates the release commit, tag, and GitHub Release.
-  - `publish-pypi.yml` builds from the release tag, publishes to TestPyPI, then publishes to PyPI through Trusted Publishing.
-- The package is MIT-licensed, but runtime-downloaded model assets can carry different licenses. The current default embedding model, `jinaai/jina-embeddings-v5-text-small-retrieval`, is documented separately from the package license.
-
 ## Documentation Map
 - [ARCHITECTURE.md](https://github.com/GeorgesAlkhouri/docctl/blob/main/ARCHITECTURE.md)
 - [docs/design-docs/index.md](https://github.com/GeorgesAlkhouri/docctl/blob/main/docs/design-docs/index.md)

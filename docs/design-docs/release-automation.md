@@ -17,7 +17,10 @@ GitHub releases, and PyPI publication deterministic and auditable.
 
 ## Workflow
 1. Maintainer triggers the `Release` workflow from `main`.
-2. The workflow runs the full repository validation suite.
+2. The workflow runs the release validation suite for releasable code and
+   packaging surfaces.
+   - Markdown link checks stay in the regular CI workflow and are not part of
+     the release-cutting job.
 3. Semantic-release updates `pyproject.toml`, `CHANGELOG.md`, and `uv.lock`,
    creates a release commit and tag, pushes them, and opens a published
    GitHub Release.
@@ -31,6 +34,8 @@ GitHub releases, and PyPI publication deterministic and auditable.
 - Trusted Publishing removes token rotation burden and narrows credential risk.
 - Building from the release tag ensures published artifacts match the tagged
   source, not the mutable state of the release-cutting job workspace.
+- An explicit source manifest keeps documentation, benchmarks, tests, and
+  repository automation files out of the source distribution.
 
 ## Consequences
 - Commits intended for `main` must use Conventional Commits.
