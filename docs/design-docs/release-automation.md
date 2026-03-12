@@ -11,6 +11,9 @@ GitHub releases, and PyPI publication deterministic and auditable.
   updates to that field.
 - Require a manual `workflow_dispatch` release workflow on `main` for release
   creation.
+- Require a repository secret named `RELEASE_TOKEN` for the release workflow so
+  automation can push the semantic-release commit and tag under the
+  repository's pull-request-only branch rules.
 - Publish to TestPyPI and PyPI from a separate workflow triggered by
   `release.published`.
 - Use PyPI Trusted Publishing instead of long-lived API tokens.
