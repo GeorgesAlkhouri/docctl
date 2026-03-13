@@ -77,16 +77,20 @@ runtime defaults in `src/docctl/chunking.py`.
 
 ### Per-Language Results
 
-| language | model | n_test | recall@1 | recall@5 | mrr@10 | p50 latency (ms) | p95 latency (ms) | ingest (s) |
-|---|---|---:|---:|---:|---:|---:|---:|---:|
-| en | paraphrase-multilingual-MiniLM-L12-v2 | 120 | 0.8667 | 0.9833 | 0.9190 | 16.56 | 136.69 | 21.41 |
-| en | paraphrase-multilingual-mpnet-base-v2 | 120 | 0.8417 | 0.9583 | 0.8911 | 23.58 | 194.76 | 21.44 |
-| en | distiluse-base-multilingual-cased-v2 | 120 | 0.8417 | 0.9667 | 0.9000 | 20.34 | 48.46 | 17.27 |
-| de | paraphrase-multilingual-MiniLM-L12-v2 | 120 | 0.7917 | 0.9333 | 0.8442 | 25.56 | 60.96 | 22.46 |
-| de | paraphrase-multilingual-mpnet-base-v2 | 120 | 0.8167 | 0.9667 | 0.8808 | 25.79 | 63.02 | 28.76 |
-| de | distiluse-base-multilingual-cased-v2 | 120 | 0.8333 | 0.9417 | 0.8865 | 22.13 | 49.03 | 21.52 |
-| en | jinaai/jina-embeddings-v5-text-small-retrieval | 120 | 0.9583 | 0.9917 | 0.9720 | 143.03 | 614.53 | 116.62 |
-| de | jinaai/jina-embeddings-v5-text-small-retrieval | 120 | 0.9083 | 0.9833 | 0.9389 | 191.11 | 341.42 | 117.04 |
+| language | model | ranking_mode | n_test | recall@1 | recall@5 | mrr@10 | p50 latency (ms) | p95 latency (ms) | ingest (s) |
+|---|---|---|---:|---:|---:|---:|---:|---:|---:|
+| en | paraphrase-multilingual-MiniLM-L12-v2 | vector_only | 120 | 0.8667 | 0.9833 | 0.9190 | 16.56 | 136.69 | 21.41 |
+| en | paraphrase-multilingual-mpnet-base-v2 | vector_only | 120 | 0.8417 | 0.9583 | 0.8911 | 23.58 | 194.76 | 21.44 |
+| en | distiluse-base-multilingual-cased-v2 | vector_only | 120 | 0.8417 | 0.9667 | 0.9000 | 20.34 | 48.46 | 17.27 |
+| de | paraphrase-multilingual-MiniLM-L12-v2 | vector_only | 120 | 0.7917 | 0.9333 | 0.8442 | 25.56 | 60.96 | 22.46 |
+| de | paraphrase-multilingual-mpnet-base-v2 | vector_only | 120 | 0.8167 | 0.9667 | 0.8808 | 25.79 | 63.02 | 28.76 |
+| de | distiluse-base-multilingual-cased-v2 | vector_only | 120 | 0.8333 | 0.9417 | 0.8865 | 22.13 | 49.03 | 21.52 |
+| en | jinaai/jina-embeddings-v5-text-small-retrieval | vector_only | 120 | 0.9583 | 0.9917 | 0.9720 | 143.03 | 614.53 | 116.62 |
+| de | jinaai/jina-embeddings-v5-text-small-retrieval | vector_only | 120 | 0.9083 | 0.9833 | 0.9389 | 191.11 | 341.42 | 117.04 |
+| en | distiluse-base-multilingual-cased-v2 | rerank | 120 | 0.9667 | 0.9833 | 0.9750 | 3351.8 | 3713.0 | 41.6 |
+| en | jinaai/jina-embeddings-v5-text-small-retrieval | rerank | 120 | 0.9833 | 1.0000 | 0.9917 | 3434.5 | 3803.5 | 177.0 |
+| de | distiluse-base-multilingual-cased-v2 | rerank | 120 | 0.9500 | 0.9750 | 0.9586 | 2660.8 | 3170.1 | 41.5 |
+| de | jinaai/jina-embeddings-v5-text-small-retrieval | rerank | 120 | 0.9583 | 0.9750 | 0.9667 | 2823.0 | 3293.8 | 255.3 |
 
 ### Macro Ranking (en/de)
 
