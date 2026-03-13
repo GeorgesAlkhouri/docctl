@@ -160,6 +160,34 @@ def test_search_command_rejects_rerank_candidates_below_top_k(
     assert "invalid rerank candidate count" in result.output
 
 
+def test_search_command_returns_early_after_invalid_rerank_candidates(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    captured: dict[str, object] = {}
+
+    def _fake_handle_error(error: Exception) -> None:
+        captured["error"] = str(error)
+
+    monkeypatch.setattr(cli, "_handle_error", _fake_handle_error)
+    monkeypatch.setattr(
+        cli,
+        "search_chunks",
+        lambda **kwargs: (_ for _ in ()).throw(AssertionError("search should not execute")),
+    )
+
+    ctx = SimpleNamespace(obj=_config(tmp_path))
+    result = cli.search(
+        ctx=ctx,
+        query="query",
+        top_k=5,
+        rerank=True,
+        rerank_candidates=4,
+    )
+
+    assert result is None
+    assert "invalid rerank candidate count" in str(captured.get("error", ""))
+
+
 def test_main_invokes_typer_app(monkeypatch: pytest.MonkeyPatch) -> None:
     calls = {"count": 0}
 

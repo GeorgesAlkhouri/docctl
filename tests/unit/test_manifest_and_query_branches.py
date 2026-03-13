@@ -6,7 +6,7 @@ from typing import Any
 import pytest
 
 from docctl.config import CliConfig
-from docctl.errors import ChunkNotFoundError, DocctlError
+from docctl.errors import ChunkNotFoundError, DocctlError, InternalDocctlError
 from docctl.service_manifest import catalog_documents, load_manifest, manifest_documents
 from docctl.service_query import (
     build_where_filter,
@@ -152,6 +152,74 @@ def test_rerank_hits_adds_metadata_and_sorts_by_rerank_score(tmp_path: Path) -> 
         "allow_download": False,
         "verbose": False,
     }
+
+
+def test_rerank_hits_returns_empty_when_candidate_hits_empty(tmp_path: Path) -> None:
+    deps = ServiceDependencies(
+        embedding_factory=lambda **kwargs: object(),
+        store_factory=lambda **kwargs: object(),
+        reranker_factory=lambda **kwargs: object(),
+    )
+    config = CliConfig(index_path=tmp_path, collection="c", embedding_model="m", rerank_model="r")
+
+    reranked = rerank_hits(
+        hits=[],
+        query="query",
+        top_k=2,
+        config=config,
+        allow_model_download=False,
+        deps=deps,
+    )
+
+    assert reranked == []
+
+
+def test_rerank_hits_raises_when_reranker_factory_missing(tmp_path: Path) -> None:
+    deps = ServiceDependencies(
+        embedding_factory=lambda **kwargs: object(),
+        store_factory=lambda **kwargs: object(),
+        reranker_factory=None,
+    )
+    config = CliConfig(index_path=tmp_path, collection="c", embedding_model="m", rerank_model="r")
+
+    with pytest.raises(InternalDocctlError, match="reranker factory is not configured"):
+        rerank_hits(
+            hits=[
+                {"rank": 1, "id": "a", "text": "A", "distance": 0.1, "score": 0.9, "metadata": {}}
+            ],
+            query="query",
+            top_k=1,
+            config=config,
+            allow_model_download=False,
+            deps=deps,
+        )
+
+
+def test_rerank_hits_raises_when_score_count_is_invalid(tmp_path: Path) -> None:
+    class _BadReranker:
+        def score(self, *, query: str, texts: list[str]) -> list[float]:
+            _ = (query, texts)
+            return [0.5]
+
+    deps = ServiceDependencies(
+        embedding_factory=lambda **kwargs: object(),
+        store_factory=lambda **kwargs: object(),
+        reranker_factory=lambda **kwargs: _BadReranker(),
+    )
+    config = CliConfig(index_path=tmp_path, collection="c", embedding_model="m", rerank_model="r")
+
+    with pytest.raises(InternalDocctlError, match="reranker returned an invalid score count"):
+        rerank_hits(
+            hits=[
+                {"rank": 1, "id": "a", "text": "A", "distance": 0.1, "score": 0.9, "metadata": {}},
+                {"rank": 2, "id": "b", "text": "B", "distance": 0.2, "score": 0.8, "metadata": {}},
+            ],
+            query="query",
+            top_k=2,
+            config=config,
+            allow_model_download=False,
+            deps=deps,
+        )
 
 
 def test_show_chunk_raises_when_store_returns_none(tmp_path: Path) -> None:

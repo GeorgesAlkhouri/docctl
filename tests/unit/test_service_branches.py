@@ -12,6 +12,7 @@ from docctl.errors import (
     EmptyExtractedTextError,
     EmptyIndexSearchError,
     InputPathNotFoundError,
+    InternalDocctlError,
 )
 from docctl.models import ChunkMetadata, ChunkRecord, DoctorCheck, DoctorReport, TextUnit
 from docctl.service_types import (
@@ -496,6 +497,42 @@ def test_session_runtime_rerank_reuses_cached_reranker(tmp_path: Path) -> None:
 
     assert calls["factory"] == 1
     assert calls["score"] == 2
+
+
+def test_session_runtime_rerank_raises_when_factory_not_configured(tmp_path: Path) -> None:
+    store = _SessionStore(
+        query_result={
+            "ids": [["chunk-1"]],
+            "documents": [["text"]],
+            "metadatas": [[{"doc_id": "d", "source": "s", "title": "t"}]],
+            "distances": [[0.1]],
+        }
+    )
+    deps = ServiceDependencies(
+        embedding_factory=lambda **kwargs: object(),
+        store_factory=lambda **kwargs: store,
+        reranker_factory=None,
+    )
+    runtime = service_session.SessionRuntime(
+        request=SessionStreamRequest(
+            config=_config(tmp_path),
+            request_lines=[],
+            allow_model_download=False,
+        ),
+        deps=deps,
+    )
+    request = service_session._SessionSearchRequest(
+        query="q",
+        top_k=1,
+        doc_id=None,
+        source=None,
+        title=None,
+        min_score=None,
+        rerank=True,
+    )
+
+    with pytest.raises(InternalDocctlError, match="reranker factory is not configured"):
+        runtime.search(request=request)
 
 
 def test_run_session_requests_skips_blank_lines_and_reports_unsupported_op(tmp_path: Path) -> None:
