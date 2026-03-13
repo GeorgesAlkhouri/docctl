@@ -1,4 +1,4 @@
-# DDES-0004 Two-Stage Retrieval Re-Ranking (Chroma + Local CrossEncoder)
+# DDES-0005 Two-Stage Retrieval Re-Ranking (Chroma + Local CrossEncoder)
 
 ## Intent
 Add modern reranking to `docctl` while preserving the existing local-first Chroma retrieval architecture and stable CLI/session contracts.
