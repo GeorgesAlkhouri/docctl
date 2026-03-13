@@ -145,9 +145,12 @@ def test_search_rerank_adds_fields_and_reorders_hits(
     assert ingest_result.exit_code == 0, ingest_result.output
 
     monkeypatch.setattr("docctl.index_store.ChromaStore.count", lambda self: 1)
-    monkeypatch.setattr(
-        "docctl.index_store.ChromaStore.query",
-        lambda self, query, top_k, where=None: {
+    query_top_k_values: list[int] = []
+
+    def _fake_query(self, query, top_k, where=None):  # noqa: ANN001
+        _ = (self, query, where)
+        query_top_k_values.append(top_k)
+        return {
             "ids": [["a", "b"]],
             "documents": [["short", "this is a longer passage"]],
             "metadatas": [
@@ -157,8 +160,9 @@ def test_search_rerank_adds_fields_and_reorders_hits(
                 ]
             ],
             "distances": [[0.0, 0.1]],
-        },
-    )
+        }
+
+    monkeypatch.setattr("docctl.index_store.ChromaStore.query", _fake_query)
 
     search_result = runner.invoke(
         app,
@@ -181,3 +185,4 @@ def test_search_rerank_adds_fields_and_reorders_hits(
     assert [hit["id"] for hit in payload["hits"]] == ["b", "a"]
     assert all("vector_rank" in hit for hit in payload["hits"])
     assert all("rerank_score" in hit for hit in payload["hits"])
+    assert query_top_k_values == [10]

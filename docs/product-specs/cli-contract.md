@@ -26,6 +26,7 @@
 - `docctl search` supports optional reranking controls:
   - `--rerank/--no-rerank` (default `--no-rerank`)
   - `--rerank-candidates` (range `[1, 100]`, must be greater than or equal to `--top-k`)
+- Rerank backend is fixed to `torch`.
 - `session` search payload supports optional reranking fields:
   - `rerank` (bool)
   - `rerank_candidates` (int range `[1, 100]`, must be greater than or equal to `top_k`)

@@ -11,8 +11,7 @@ from .models import ChunkMetadata, ChunkRecord, SearchHit
 from .service_types import SearchRequest, ServiceDependencies, ShowRequest, Store
 from .text_sanitize import sanitize_text
 
-RERANK_DEFAULT_MIN_CANDIDATES = 20
-RERANK_DEFAULT_MULTIPLIER = 4
+RERANK_DEFAULT_MIN_CANDIDATES = 10
 RERANK_MAX_CANDIDATES = 100
 
 
@@ -130,10 +129,7 @@ def resolve_rerank_candidate_count(*, top_k: int, rerank_candidates: int | None)
         DocctlError: If explicit candidate depth is smaller than `top_k`.
     """
     if rerank_candidates is None:
-        return min(
-            max(top_k * RERANK_DEFAULT_MULTIPLIER, RERANK_DEFAULT_MIN_CANDIDATES),
-            RERANK_MAX_CANDIDATES,
-        )
+        return min(max(top_k, RERANK_DEFAULT_MIN_CANDIDATES), RERANK_MAX_CANDIDATES)
     if rerank_candidates < top_k:
         raise DocctlError(
             message="invalid rerank candidate count: rerank_candidates must be >= top_k",

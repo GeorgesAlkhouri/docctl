@@ -335,7 +335,9 @@ def prepare_language_corpus(
     }
 
 
-def split_queries(*, queries: list[QuerySpec], language: str, seed: int) -> dict[str, list[QuerySpec]]:
+def split_queries(
+    *, queries: list[QuerySpec], language: str, seed: int
+) -> dict[str, list[QuerySpec]]:
     """Create deterministic train/validation/test query splits.
 
     The benchmark computes primary metrics on the hold-out `test` split.
@@ -370,7 +372,9 @@ def split_queries(*, queries: list[QuerySpec], language: str, seed: int) -> dict
         shuffled[train_count : train_count + validation_count],
         key=lambda item: item.query_id,
     )
-    test_queries = sorted(shuffled[train_count + validation_count :], key=lambda item: item.query_id)
+    test_queries = sorted(
+        shuffled[train_count + validation_count :], key=lambda item: item.query_id
+    )
     return {
         "train": train_queries,
         "validation": validation_queries,
@@ -687,8 +691,7 @@ def finalize_session_process(*, process: subprocess.Popen[str]) -> None:
         raise RuntimeError(f"Unexpected trailing session stdout:\n{stdout_tail}")
     if process.returncode != 0:
         raise RuntimeError(
-            f"Session failed with exit code {process.returncode}\n"
-            f"stderr:\n{stderr_tail}"
+            f"Session failed with exit code {process.returncode}\nstderr:\n{stderr_tail}"
         )
 
 
@@ -788,9 +791,7 @@ def summarize_aggregates(
     for mode in ranking_modes:
         for model in models:
             rows = [
-                row
-                for row in results
-                if row["model"] == model and row["ranking_mode"] == mode.key
+                row for row in results if row["model"] == model and row["ranking_mode"] == mode.key
             ]
             if not rows:
                 continue
@@ -800,8 +801,12 @@ def summarize_aggregates(
                     "ranking_mode": mode.key,
                     "languages_evaluated": sorted({row["language"] for row in rows}),
                     "macro_avg": {
-                        "recall_at_1": statistics.mean(row["metrics"]["recall_at_1"] for row in rows),
-                        "recall_at_5": statistics.mean(row["metrics"]["recall_at_5"] for row in rows),
+                        "recall_at_1": statistics.mean(
+                            row["metrics"]["recall_at_1"] for row in rows
+                        ),
+                        "recall_at_5": statistics.mean(
+                            row["metrics"]["recall_at_5"] for row in rows
+                        ),
                         "mrr_at_10": statistics.mean(row["metrics"]["mrr_at_10"] for row in rows),
                         "query_latency_ms_p50": statistics.mean(
                             row["metrics"]["query_latency_ms_p50"] for row in rows
@@ -888,13 +893,11 @@ def sample_size_summary(report: dict[str, Any]) -> tuple[dict[str, int], dict[st
     settings = report["settings"]
     language_meta = report["dataset_meta"]["languages"]
     sampled_by_language = {
-        str(row["language"]): int(row.get("queries_selected", 0))
-        for row in language_meta
+        str(row["language"]): int(row.get("queries_selected", 0)) for row in language_meta
     }
     split_counts_by_language = {
         str(row["language"]): {
-            str(split): int(count)
-            for split, count in row.get("query_split_counts", {}).items()
+            str(split): int(count) for split, count in row.get("query_split_counts", {}).items()
         }
         for row in language_meta
     }
@@ -970,8 +973,7 @@ def build_results_markdown(report: dict[str, Any]) -> str:
         f"(metrics on `{settings['evaluation_split']}`)"
     )
     sampled_parts = [
-        f"{language}={sampled_by_language.get(language, 0)}"
-        for language in settings["languages"]
+        f"{language}={sampled_by_language.get(language, 0)}" for language in settings["languages"]
     ]
     lines.append(f"- Sample size (sampled queries): `{', '.join(sampled_parts)}`")
     eval_parts = [
@@ -1096,8 +1098,7 @@ def main() -> None:  # noqa: PLR0915
         split_map = split_queries(queries=queries, language=language, seed=args.seed)
         language_query_splits[language] = split_map
         lang_meta["query_split_counts"] = {
-            split_name: len(split_queries_)
-            for split_name, split_queries_ in split_map.items()
+            split_name: len(split_queries_) for split_name, split_queries_ in split_map.items()
         }
         dataset_meta_languages.append(lang_meta)
 
@@ -1117,7 +1118,9 @@ def main() -> None:  # noqa: PLR0915
         },
     }
     manifest_path = work_dir / "query_manifest.json"
-    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
 
     results: list[dict[str, Any]] = []
     for language in args.languages:

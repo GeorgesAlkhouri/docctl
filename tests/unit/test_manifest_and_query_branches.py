@@ -97,8 +97,8 @@ def test_search_hits_respects_min_score_threshold() -> None:
 
 
 def test_resolve_rerank_candidate_count_defaults_and_bounds() -> None:
-    assert resolve_rerank_candidate_count(top_k=5, rerank_candidates=None) == 20
-    assert resolve_rerank_candidate_count(top_k=30, rerank_candidates=None) == 100
+    assert resolve_rerank_candidate_count(top_k=5, rerank_candidates=None) == 10
+    assert resolve_rerank_candidate_count(top_k=30, rerank_candidates=None) == 30
     assert resolve_rerank_candidate_count(top_k=5, rerank_candidates=7) == 7
 
     with pytest.raises(DocctlError):
@@ -111,12 +111,23 @@ def test_rerank_hits_adds_metadata_and_sorts_by_rerank_score(tmp_path: Path) -> 
             _ = query
             return [0.1, 0.9, 0.9][: len(texts)]
 
+    captured: dict[str, Any] = {}
+
+    def _factory(**kwargs: Any) -> _Reranker:
+        captured.update(kwargs)
+        return _Reranker()
+
     deps = ServiceDependencies(
         embedding_factory=lambda **kwargs: object(),
         store_factory=lambda **kwargs: object(),
-        reranker_factory=lambda **kwargs: _Reranker(),
+        reranker_factory=_factory,
     )
-    config = CliConfig(index_path=tmp_path, collection="c", embedding_model="m", rerank_model="r")
+    config = CliConfig(
+        index_path=tmp_path,
+        collection="c",
+        embedding_model="m",
+        rerank_model="r",
+    )
     hits = [
         {"rank": 1, "id": "a", "text": "A", "distance": 0.1, "score": 0.9, "metadata": {}},
         {"rank": 2, "id": "b", "text": "B", "distance": 0.2, "score": 0.8, "metadata": {}},
@@ -136,6 +147,11 @@ def test_rerank_hits_adds_metadata_and_sorts_by_rerank_score(tmp_path: Path) -> 
     assert [hit["rank"] for hit in reranked] == [1, 2]
     assert [hit["vector_rank"] for hit in reranked] == [2, 3]
     assert all("rerank_score" in hit for hit in reranked)
+    assert captured == {
+        "model_name": "r",
+        "allow_download": False,
+        "verbose": False,
+    }
 
 
 def test_show_chunk_raises_when_store_returns_none(tmp_path: Path) -> None:

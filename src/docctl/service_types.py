@@ -16,7 +16,7 @@ from .models import ChunkRecord
 class EmbeddingFactory(Protocol):
     """Create an embedding function from CLI configuration values."""
 
-    def __call__(
+    def __call__(  # noqa: PLR0913
         self,
         *,
         model_name: str,

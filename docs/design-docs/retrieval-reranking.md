@@ -26,7 +26,7 @@ Reranking is opt-in (`--rerank` / session `rerank: true`) and does not change de
 ## Ranking Policy
 - Final result count remains `top_k`.
 - Default candidate depth for reranking is bounded:
-  - `candidate_k = min(max(top_k * 4, 20), 100)`
+  - `candidate_k = min(max(top_k, 10), 100)`
 - Explicit candidate depth must satisfy `candidate_k >= top_k`.
 - Ties in rerank score are resolved by original vector order for deterministic output.
 
@@ -34,3 +34,7 @@ Reranking is opt-in (`--rerank` / session `rerank: true`) and does not change de
 - Default reranker model: `BAAI/bge-reranker-v2-m3`
 - Configurable via `DOCCTL_RERANK_MODEL`
 - Uses existing `--allow-model-download` behavior for local artifact availability.
+
+## Runtime Notes
+- Backend: fixed `torch` runtime backend.
+- Candidate depth defaults to `min(max(top_k, 10), 100)` unless explicitly set with `--rerank-candidates`.

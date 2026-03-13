@@ -3,6 +3,7 @@ from __future__ import annotations
 import runpy
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import typer
@@ -21,6 +22,28 @@ def _config(tmp_path: Path, *, json_output: bool = False, verbose: bool = False)
         embedding_model="model",
         require_write_approval=False,
     )
+
+
+def test_callback_sets_rerank_and_embedding_models(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("DOCCTL_EMBEDDING_MODEL", "embed-x")
+    monkeypatch.setenv("DOCCTL_RERANK_MODEL", "rerank-x")
+    monkeypatch.setenv("DOCCTL_REQUIRE_WRITE_APPROVAL", "1")
+    ctx = SimpleNamespace(obj=None)
+
+    cli.callback(
+        ctx=ctx,
+        index_path=tmp_path,
+        collection="c",
+        json_output=False,
+        verbose=False,
+    )
+
+    config = ctx.obj
+    assert config.embedding_model == "embed-x"
+    assert config.rerank_model == "rerank-x"
+    assert config.require_write_approval is True
 
 
 def test_emit_success_human_output_uses_key_value_lines(

@@ -89,7 +89,7 @@ def patch_fake_embeddings(monkeypatch: pytest.MonkeyPatch) -> None:
 def patch_fake_reranker(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "docctl.services.create_reranker",
-        lambda model_name, allow_download, verbose=False: FakeReranker(),
+        lambda model_name, allow_download, verbose=False, **kwargs: FakeReranker(),
     )
 
 

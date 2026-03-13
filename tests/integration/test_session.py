@@ -295,9 +295,12 @@ def test_session_search_with_rerank_adds_fields(
     assert ingest_result.exit_code == 0, ingest_result.output
 
     monkeypatch.setattr("docctl.index_store.ChromaStore.count", lambda self: 1)
-    monkeypatch.setattr(
-        "docctl.index_store.ChromaStore.query",
-        lambda self, query, top_k, where=None: {
+    query_top_k_values: list[int] = []
+
+    def _fake_query(self, query, top_k, where=None):  # noqa: ANN001
+        _ = (self, query, where)
+        query_top_k_values.append(top_k)
+        return {
             "ids": [["a", "b"]],
             "documents": [["short", "this is a longer passage"]],
             "metadatas": [
@@ -307,8 +310,9 @@ def test_session_search_with_rerank_adds_fields(
                 ]
             ],
             "distances": [[0.0, 0.1]],
-        },
-    )
+        }
+
+    monkeypatch.setattr("docctl.index_store.ChromaStore.query", _fake_query)
 
     request_line = json.dumps(
         {
@@ -332,11 +336,10 @@ def test_session_search_with_rerank_adds_fields(
     assert [hit["id"] for hit in hits] == ["b", "a"]
     assert all("vector_rank" in hit for hit in hits)
     assert all("rerank_score" in hit for hit in hits)
+    assert query_top_k_values == [10]
 
 
-def test_session_search_rejects_rerank_candidates_below_top_k(
-    runner, tmp_path: Path
-) -> None:
+def test_session_search_rejects_rerank_candidates_below_top_k(runner, tmp_path: Path) -> None:
     index_path = tmp_path / "index"
     request_lines = json.dumps(
         {
