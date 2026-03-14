@@ -11,7 +11,7 @@ from .models import ChunkMetadata, ChunkRecord, SearchHit
 from .service_types import SearchRequest, ServiceDependencies, ShowRequest, Store
 from .text_sanitize import sanitize_text
 
-RERANK_DEFAULT_MIN_CANDIDATES = 10
+RERANK_DEFAULT_MIN_CANDIDATES = 5
 RERANK_MAX_CANDIDATES = 100
 
 

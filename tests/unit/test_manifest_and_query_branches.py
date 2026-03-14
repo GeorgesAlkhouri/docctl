@@ -97,7 +97,7 @@ def test_search_hits_respects_min_score_threshold() -> None:
 
 
 def test_resolve_rerank_candidate_count_defaults_and_bounds() -> None:
-    assert resolve_rerank_candidate_count(top_k=5, rerank_candidates=None) == 10
+    assert resolve_rerank_candidate_count(top_k=5, rerank_candidates=None) == 5
     assert resolve_rerank_candidate_count(top_k=30, rerank_candidates=None) == 30
     assert resolve_rerank_candidate_count(top_k=5, rerank_candidates=7) == 7
 

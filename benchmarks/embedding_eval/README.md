@@ -22,7 +22,7 @@ uv run --with datasets python benchmarks/embedding_eval/run_xquad_benchmark.py
 Default run behavior:
 - `--queries-per-lang 200` (with split `train=20%`, `validation=20%`, `test=60%`, so `n_test=120` per language)
 - reranking is enabled by default (`--rerank`) using `BAAI/bge-reranker-v2-m3`
-- rerank candidate depth defaults to `min(max(top_k, 10), 100)` unless `--rerank-candidates` is set explicitly
+- rerank candidate depth defaults to `min(max(top_k, 5), 100)` unless `--rerank-candidates` is set explicitly
 - reranker runtime backend is fixed to `torch`
 
 Default benchmark chunking:
