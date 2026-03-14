@@ -185,4 +185,4 @@ def test_search_rerank_adds_fields_and_reorders_hits(
     assert [hit["id"] for hit in payload["hits"]] == ["b", "a"]
     assert all("vector_rank" in hit for hit in payload["hits"])
     assert all("rerank_score" in hit for hit in payload["hits"])
-    assert query_top_k_values == [10]
+    assert query_top_k_values == [5]

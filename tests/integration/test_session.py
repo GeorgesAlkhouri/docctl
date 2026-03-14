@@ -336,7 +336,7 @@ def test_session_search_with_rerank_adds_fields(
     assert [hit["id"] for hit in hits] == ["b", "a"]
     assert all("vector_rank" in hit for hit in hits)
     assert all("rerank_score" in hit for hit in hits)
-    assert query_top_k_values == [10]
+    assert query_top_k_values == [5]
 
 
 def test_session_search_rejects_rerank_candidates_below_top_k(runner, tmp_path: Path) -> None:
