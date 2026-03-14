@@ -53,29 +53,26 @@ The skill makes `session` for fast iterative retrieval.
 ## Quickstart
 Requirements:
 - Python 3.12 or 3.13
-- `uv`
+- `pip`
 
 ```bash
-# 1) Install dependencies
-uv sync --frozen --dev
-
-# 2) Verify CLI
-uv run docctl --help
-
-# 3) Ingest supported files
-uv run docctl ingest ./docs --recursive --approve-write --allow-model-download
-
-# 4) Search indexed content
-uv run docctl search "security gateway diagnostics" --top-k 5 --allow-model-download
-
-# 5) Show one chunk by id (replace with an id from search output)
-uv run docctl show <chunk_id_from_search> --allow-model-download
-```
-
-After the first public release, install from PyPI with:
-
-```bash
+# 1) Install from PyPI
 pip install docctl
+
+# 2) Optional: install GPU-linked torch dependencies (Linux x86_64)
+pip install --upgrade "docctl[gpu]"
+
+# 3) Verify CLI
+docctl --help
+
+# 4) Ingest supported files
+docctl ingest ./docs --recursive --approve-write --allow-model-download
+
+# 5) Search indexed content
+docctl search "security gateway diagnostics" --top-k 5 --allow-model-download
+
+# 6) Show one chunk by id (replace with an id from search output)
+docctl show <chunk_id_from_search> --allow-model-download
 ```
 
 ## Command Overview
@@ -93,13 +90,13 @@ pip install docctl
 Use `--json` for deterministic machine-readable output:
 
 ```bash
-uv run docctl --json search "security gateway diagnostics" --top-k 5 --allow-model-download
+docctl --json search "security gateway diagnostics" --top-k 5 --allow-model-download
 ```
 
 Use `session` for NDJSON request/response flows. For agents, this is the preferred fast path whenever one workflow needs two or more read operations:
 
 ```bash
-cat <<'EOF' | uv run docctl session --allow-model-download
+cat <<'EOF' | docctl session --allow-model-download
 {"id":"q1","op":"search","query":"security gateway diagnostics","top_k":5}
 {"id":"q2","op":"catalog"}
 EOF

@@ -12,6 +12,7 @@ from docctl.errors import (
     EmptyExtractedTextError,
     EmptyIndexSearchError,
     InputPathNotFoundError,
+    InternalDocctlError,
 )
 from docctl.models import ChunkMetadata, ChunkRecord, DoctorCheck, DoctorReport, TextUnit
 from docctl.service_types import (
@@ -61,6 +62,16 @@ class _SessionStore:
 
     def delete_by_doc_id(self, doc_id: str) -> None:
         _ = doc_id
+
+
+class _CountingReranker:
+    def __init__(self, calls: dict[str, int]) -> None:
+        self._calls = calls
+
+    def score(self, *, query: str, texts: list[str]) -> list[float]:
+        _ = query
+        self._calls["score"] += 1
+        return [float(index) for index, _text in enumerate(texts, start=1)]
 
 
 def _config(tmp_path: Path, *, verbose: bool = False) -> CliConfig:
@@ -432,11 +443,96 @@ def test_search_and_show_handlers_validate_required_fields(tmp_path: Path) -> No
         service_session._handle_search(runtime, {"query": "ok", "top_k": 0})
     with pytest.raises(DocctlError, match="invalid session request field 'source'"):
         service_session._handle_search(runtime, {"query": "ok", "source": 7})
+    with pytest.raises(DocctlError, match="invalid session request field 'rerank'"):
+        service_session._handle_search(runtime, {"query": "ok", "rerank": "true"})
+    with pytest.raises(DocctlError, match="invalid session request field 'rerank_candidates'"):
+        service_session._handle_search(
+            runtime,
+            {"query": "ok", "top_k": 5, "rerank": True, "rerank_candidates": 4},
+        )
     with pytest.raises(DocctlError, match="invalid session request field 'chunk_id'"):
         service_session._handle_show(runtime, {"chunk_id": 7})
 
     show_result = service_session._handle_show(runtime, {"chunk_id": "chunk-1"})
     assert show_result["id"] == "chunk-1"
+
+
+def test_session_runtime_rerank_reuses_cached_reranker(tmp_path: Path) -> None:
+    calls = {"factory": 0, "score": 0}
+    store = _SessionStore(
+        query_result={
+            "ids": [["chunk-1"]],
+            "documents": [["text"]],
+            "metadatas": [[{"doc_id": "d", "source": "s", "title": "t"}]],
+            "distances": [[0.1]],
+        }
+    )
+    deps = ServiceDependencies(
+        embedding_factory=lambda **kwargs: object(),
+        store_factory=lambda **kwargs: store,
+        reranker_factory=lambda **kwargs: (
+            calls.__setitem__("factory", calls["factory"] + 1) or _CountingReranker(calls)
+        ),
+    )
+    runtime = service_session.SessionRuntime(
+        request=SessionStreamRequest(
+            config=_config(tmp_path),
+            request_lines=[],
+            allow_model_download=False,
+        ),
+        deps=deps,
+    )
+
+    request = service_session._SessionSearchRequest(
+        query="q",
+        top_k=1,
+        doc_id=None,
+        source=None,
+        title=None,
+        min_score=None,
+        rerank=True,
+    )
+    runtime.search(request=request)
+    runtime.search(request=request)
+
+    assert calls["factory"] == 1
+    assert calls["score"] == 2
+
+
+def test_session_runtime_rerank_raises_when_factory_not_configured(tmp_path: Path) -> None:
+    store = _SessionStore(
+        query_result={
+            "ids": [["chunk-1"]],
+            "documents": [["text"]],
+            "metadatas": [[{"doc_id": "d", "source": "s", "title": "t"}]],
+            "distances": [[0.1]],
+        }
+    )
+    deps = ServiceDependencies(
+        embedding_factory=lambda **kwargs: object(),
+        store_factory=lambda **kwargs: store,
+        reranker_factory=None,
+    )
+    runtime = service_session.SessionRuntime(
+        request=SessionStreamRequest(
+            config=_config(tmp_path),
+            request_lines=[],
+            allow_model_download=False,
+        ),
+        deps=deps,
+    )
+    request = service_session._SessionSearchRequest(
+        query="q",
+        top_k=1,
+        doc_id=None,
+        source=None,
+        title=None,
+        min_score=None,
+        rerank=True,
+    )
+
+    with pytest.raises(InternalDocctlError, match="reranker factory is not configured"):
+        runtime.search(request=request)
 
 
 def test_run_session_requests_skips_blank_lines_and_reports_unsupported_op(tmp_path: Path) -> None:

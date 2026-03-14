@@ -78,14 +78,42 @@ class IngestConfig:
 class IngestDependencies:
     """Bundle lazy-loaded docctl ingest callables."""
 
-    chunk_document_pages: Any
+    chunk_document_units: Any
     create_embedding_function: Any
     build_doc_id: Any
     chroma_store_cls: Any
-    extract_pdf_pages: Any
+    extract_pdf_units: Any
 
 
-def parse_args() -> argparse.Namespace:
+@dataclass(slots=True, frozen=True)
+class RankingMode:
+    """Represent one retrieval ranking mode benchmark dimension."""
+
+    key: str
+    rerank: bool
+
+
+def resolve_ranking_modes(*, rerank: bool, rerank_matrix: bool) -> list[RankingMode]:
+    """Resolve ranking-mode benchmark dimensions from CLI options.
+
+    Args:
+        rerank: Single-mode rerank toggle.
+        rerank_matrix: Whether both baseline and rerank modes should run.
+
+    Returns:
+        Ordered ranking modes to evaluate for each language/model pair.
+    """
+    if rerank_matrix:
+        return [
+            RankingMode(key="vector_only", rerank=False),
+            RankingMode(key="rerank", rerank=True),
+        ]
+    if rerank:
+        return [RankingMode(key="rerank", rerank=True)]
+    return [RankingMode(key="vector_only", rerank=False)]
+
+
+def parse_args() -> argparse.Namespace:  # noqa: C901, PLR0915
     """Parse benchmark CLI options."""
 
     parser = argparse.ArgumentParser(
@@ -94,7 +122,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--queries-per-lang",
         type=int,
-        default=100,
+        default=200,
         help="Number of deterministic sampled queries per language.",
     )
     parser.add_argument(
@@ -145,6 +173,30 @@ def parse_args() -> argparse.Namespace:
         default=True,
         help="Allow docctl to download missing embedding artifacts.",
     )
+    parser.add_argument(
+        "--rerank",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Enable second-stage reranking in session search requests.",
+    )
+    parser.add_argument(
+        "--rerank-matrix",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Evaluate both baseline and rerank modes as one benchmark matrix.",
+    )
+    parser.add_argument(
+        "--rerank-model",
+        type=str,
+        default="BAAI/bge-reranker-v2-m3",
+        help="Reranker model configured via DOCCTL_RERANK_MODEL.",
+    )
+    parser.add_argument(
+        "--rerank-candidates",
+        type=int,
+        default=None,
+        help="Optional candidate depth used before reranking.",
+    )
     args = parser.parse_args()
 
     if args.queries_per_lang <= 0:
@@ -157,6 +209,10 @@ def parse_args() -> argparse.Namespace:
         raise SystemExit("--chunk-overlap must be non-negative")
     if args.chunk_overlap >= args.chunk_size:
         raise SystemExit("--chunk-overlap must be smaller than --chunk-size")
+    if args.rerank_candidates is not None and not (1 <= args.rerank_candidates <= 100):
+        raise SystemExit("--rerank-candidates must be in range [1, 100]")
+    if args.rerank_candidates is not None and args.rerank_candidates < args.top_k:
+        raise SystemExit("--rerank-candidates must be greater than or equal to --top-k")
 
     languages = [part.strip() for part in args.languages.split(",") if part.strip()]
     if not languages:
@@ -279,7 +335,9 @@ def prepare_language_corpus(
     }
 
 
-def split_queries(*, queries: list[QuerySpec], language: str, seed: int) -> dict[str, list[QuerySpec]]:
+def split_queries(
+    *, queries: list[QuerySpec], language: str, seed: int
+) -> dict[str, list[QuerySpec]]:
     """Create deterministic train/validation/test query splits.
 
     The benchmark computes primary metrics on the hold-out `test` split.
@@ -314,7 +372,9 @@ def split_queries(*, queries: list[QuerySpec], language: str, seed: int) -> dict
         shuffled[train_count : train_count + validation_count],
         key=lambda item: item.query_id,
     )
-    test_queries = sorted(shuffled[train_count + validation_count :], key=lambda item: item.query_id)
+    test_queries = sorted(
+        shuffled[train_count + validation_count :], key=lambda item: item.query_id
+    )
     return {
         "train": train_queries,
         "validation": validation_queries,
@@ -345,11 +405,11 @@ def load_docctl_ingest_dependencies() -> IngestDependencies:
     """Import benchmark ingest dependencies lazily from docctl internals."""
 
     try:
-        from docctl.chunking import chunk_document_pages
+        from docctl.chunking import chunk_document_units
         from docctl.embeddings import create_embedding_function
         from docctl.ids import build_doc_id
         from docctl.index_store import ChromaStore
-        from docctl.pdf_extract import extract_pdf_pages
+        from docctl.pdf_extract import extract_pdf_units
     except ImportError as error:  # pragma: no cover - operator environment check
         raise RuntimeError(
             "Failed to import docctl modules for benchmark ingest. "
@@ -357,11 +417,11 @@ def load_docctl_ingest_dependencies() -> IngestDependencies:
         ) from error
 
     return IngestDependencies(
-        chunk_document_pages=chunk_document_pages,
+        chunk_document_units=chunk_document_units,
         create_embedding_function=create_embedding_function,
         build_doc_id=build_doc_id,
         chroma_store_cls=ChromaStore,
-        extract_pdf_pages=extract_pdf_pages,
+        extract_pdf_units=extract_pdf_units,
     )
 
 
@@ -372,17 +432,17 @@ def ingest_one_pdf(
     dependencies: IngestDependencies,
     config: IngestConfig,
 ) -> tuple[int, int]:
-    """Ingest one PDF into an existing store and return page/chunk counts."""
+    """Ingest one PDF into an existing store and return unit/chunk counts."""
 
     source = str(pdf_path.resolve())
     title = pdf_path.stem
     doc_id = str(dependencies.build_doc_id(source))
-    pages = dependencies.extract_pdf_pages(pdf_path)
-    chunks = dependencies.chunk_document_pages(
+    units = dependencies.extract_pdf_units(pdf_path)
+    chunks = dependencies.chunk_document_units(
         doc_id=doc_id,
         source=source,
         title=title,
-        pages=pages,
+        units=units,
         chunk_size=config.chunk_size,
         chunk_overlap=config.chunk_overlap,
     )
@@ -390,7 +450,7 @@ def ingest_one_pdf(
         raise RuntimeError(f"No chunks produced for PDF: {pdf_path}")
     store.delete_by_doc_id(doc_id)
     store.upsert_chunks(chunks)
-    return len(pages), len(chunks)
+    return len(units), len(chunks)
 
 
 def ingest_corpus_with_custom_chunking(
@@ -482,13 +542,16 @@ def run_ingest(
     return ingest_seconds, ingest_payload, index_path
 
 
-def query_session(
+def query_session(  # noqa: PLR0913
     *,
     queries: list[QuerySpec],
     model_name: str,
     index_path: Path,
     top_k: int,
     allow_model_download: bool,
+    rerank: bool,
+    rerank_candidates: int | None,
+    rerank_model: str,
 ) -> tuple[list[dict[str, Any]], list[float]]:
     """Execute queries in one docctl session and capture per-query latency."""
 
@@ -496,11 +559,14 @@ def query_session(
         model_name=model_name,
         index_path=index_path,
         allow_model_download=allow_model_download,
+        rerank_model=rerank_model,
     )
     responses, latencies_ms = execute_session_queries(
         process=process,
         queries=queries,
         top_k=top_k,
+        rerank=rerank,
+        rerank_candidates=rerank_candidates,
     )
     finalize_session_process(process=process)
     return responses, latencies_ms
@@ -511,6 +577,7 @@ def open_session_process(
     model_name: str,
     index_path: Path,
     allow_model_download: bool,
+    rerank_model: str,
 ) -> subprocess.Popen[str]:
     """Start docctl session subprocess for iterative search requests."""
 
@@ -529,6 +596,7 @@ def open_session_process(
 
     env = dict(os.environ)
     env["DOCCTL_EMBEDDING_MODEL"] = model_name
+    env["DOCCTL_RERANK_MODEL"] = rerank_model
 
     return subprocess.Popen(
         command,
@@ -547,6 +615,8 @@ def execute_session_queries(
     process: subprocess.Popen[str],
     queries: list[QuerySpec],
     top_k: int,
+    rerank: bool,
+    rerank_candidates: int | None,
 ) -> tuple[list[dict[str, Any]], list[float]]:
     """Send search requests over one live session process."""
 
@@ -561,6 +631,8 @@ def execute_session_queries(
                 process=process,
                 query_spec=spec,
                 top_k=top_k,
+                rerank=rerank,
+                rerank_candidates=rerank_candidates,
             )
             if not response.get("ok", False):
                 raise RuntimeError(f"Session query failed: {response}")
@@ -578,6 +650,8 @@ def send_search_request(
     process: subprocess.Popen[str],
     query_spec: QuerySpec,
     top_k: int,
+    rerank: bool,
+    rerank_candidates: int | None,
 ) -> tuple[dict[str, Any], float]:
     """Send one search request and return parsed response with latency."""
 
@@ -590,6 +664,10 @@ def send_search_request(
         "query": query_spec.query,
         "top_k": top_k,
     }
+    if rerank:
+        request["rerank"] = True
+        if rerank_candidates is not None:
+            request["rerank_candidates"] = rerank_candidates
     request_line = json.dumps(request, ensure_ascii=False)
 
     start = time.perf_counter()
@@ -613,8 +691,7 @@ def finalize_session_process(*, process: subprocess.Popen[str]) -> None:
         raise RuntimeError(f"Unexpected trailing session stdout:\n{stdout_tail}")
     if process.returncode != 0:
         raise RuntimeError(
-            f"Session failed with exit code {process.returncode}\n"
-            f"stderr:\n{stderr_tail}"
+            f"Session failed with exit code {process.returncode}\nstderr:\n{stderr_tail}"
         )
 
 
@@ -687,46 +764,60 @@ def summarize_aggregates(
     results: list[dict[str, Any]],
     languages: list[str],
     models: list[str],
+    ranking_modes: list[RankingMode],
 ) -> dict[str, Any]:
     """Build language leaderboard and macro-average model ranking."""
 
     language_leaderboards: dict[str, list[dict[str, Any]]] = {}
     for language in languages:
-        per_language = [row for row in results if row["language"] == language]
-        ranked = sorted(
-            per_language,
-            key=lambda row: (
-                row["metrics"]["mrr_at_10"],
-                row["metrics"]["recall_at_5"],
-                -row["metrics"]["query_latency_ms_p95"],
-            ),
-            reverse=True,
-        )
-        language_leaderboards[language] = ranked
+        for mode in ranking_modes:
+            per_language_mode = [
+                row
+                for row in results
+                if row["language"] == language and row["ranking_mode"] == mode.key
+            ]
+            ranked = sorted(
+                per_language_mode,
+                key=lambda row: (
+                    row["metrics"]["mrr_at_10"],
+                    row["metrics"]["recall_at_5"],
+                    -row["metrics"]["query_latency_ms_p95"],
+                ),
+                reverse=True,
+            )
+            language_leaderboards[f"{language}:{mode.key}"] = ranked
 
     macro_by_model: list[dict[str, Any]] = []
-    for model in models:
-        rows = [row for row in results if row["model"] == model]
-        if not rows:
-            continue
-        macro_by_model.append(
-            {
-                "model": model,
-                "languages_evaluated": sorted({row["language"] for row in rows}),
-                "macro_avg": {
-                    "recall_at_1": statistics.mean(row["metrics"]["recall_at_1"] for row in rows),
-                    "recall_at_5": statistics.mean(row["metrics"]["recall_at_5"] for row in rows),
-                    "mrr_at_10": statistics.mean(row["metrics"]["mrr_at_10"] for row in rows),
-                    "query_latency_ms_p50": statistics.mean(
-                        row["metrics"]["query_latency_ms_p50"] for row in rows
-                    ),
-                    "query_latency_ms_p95": statistics.mean(
-                        row["metrics"]["query_latency_ms_p95"] for row in rows
-                    ),
-                    "ingest_seconds": statistics.mean(row["ingest_seconds"] for row in rows),
-                },
-            }
-        )
+    for mode in ranking_modes:
+        for model in models:
+            rows = [
+                row for row in results if row["model"] == model and row["ranking_mode"] == mode.key
+            ]
+            if not rows:
+                continue
+            macro_by_model.append(
+                {
+                    "model": model,
+                    "ranking_mode": mode.key,
+                    "languages_evaluated": sorted({row["language"] for row in rows}),
+                    "macro_avg": {
+                        "recall_at_1": statistics.mean(
+                            row["metrics"]["recall_at_1"] for row in rows
+                        ),
+                        "recall_at_5": statistics.mean(
+                            row["metrics"]["recall_at_5"] for row in rows
+                        ),
+                        "mrr_at_10": statistics.mean(row["metrics"]["mrr_at_10"] for row in rows),
+                        "query_latency_ms_p50": statistics.mean(
+                            row["metrics"]["query_latency_ms_p50"] for row in rows
+                        ),
+                        "query_latency_ms_p95": statistics.mean(
+                            row["metrics"]["query_latency_ms_p95"] for row in rows
+                        ),
+                        "ingest_seconds": statistics.mean(row["ingest_seconds"] for row in rows),
+                    },
+                }
+            )
 
     macro_ranking = sorted(
         macro_by_model,
@@ -764,6 +855,8 @@ def write_results_artifacts(
             [
                 "language",
                 "model",
+                "ranking_mode",
+                "rerank_enabled",
                 "recall_at_1",
                 "recall_at_5",
                 "mrr_at_10",
@@ -779,6 +872,8 @@ def write_results_artifacts(
                 [
                     row["language"],
                     row["model"],
+                    row["ranking_mode"],
+                    row["rerank_enabled"],
                     f"{metrics['recall_at_1']:.6f}",
                     f"{metrics['recall_at_5']:.6f}",
                     f"{metrics['mrr_at_10']:.6f}",
@@ -798,13 +893,11 @@ def sample_size_summary(report: dict[str, Any]) -> tuple[dict[str, int], dict[st
     settings = report["settings"]
     language_meta = report["dataset_meta"]["languages"]
     sampled_by_language = {
-        str(row["language"]): int(row.get("queries_selected", 0))
-        for row in language_meta
+        str(row["language"]): int(row.get("queries_selected", 0)) for row in language_meta
     }
     split_counts_by_language = {
         str(row["language"]): {
-            str(split): int(count)
-            for split, count in row.get("query_split_counts", {}).items()
+            str(split): int(count) for split, count in row.get("query_split_counts", {}).items()
         }
         for row in language_meta
     }
@@ -823,14 +916,14 @@ def append_per_language_results(lines: list[str], report: dict[str, Any]) -> Non
     lines.append("### Per-Language Results")
     lines.append("")
     lines.append(
-        "| language | model | n_test | recall@1 | recall@5 | mrr@10 | p50 latency (ms) | p95 latency (ms) | ingest (s) |"
+        "| language | ranking_mode | model | n_test | recall@1 | recall@5 | mrr@10 | p50 latency (ms) | p95 latency (ms) | ingest (s) |"
     )
-    lines.append("|---|---|---:|---:|---:|---:|---:|---:|---:|")
+    lines.append("|---|---|---|---:|---:|---:|---:|---:|---:|---:|")
     for row in report["results"]:
         metrics = row["metrics"]
         lines.append(
             "| "
-            f"{row['language']} | {row['model']} | {row['query_count']} | "
+            f"{row['language']} | {row['ranking_mode']} | {row['model']} | {row['query_count']} | "
             f"{metrics['recall_at_1']:.4f} | "
             f"{metrics['recall_at_5']:.4f} | {metrics['mrr_at_10']:.4f} | "
             f"{metrics['query_latency_ms_p50']:.2f} | {metrics['query_latency_ms_p95']:.2f} | "
@@ -842,17 +935,17 @@ def append_per_language_results(lines: list[str], report: dict[str, Any]) -> Non
 def append_macro_ranking(lines: list[str], report: dict[str, Any]) -> None:
     """Append macro ranking table to markdown output."""
 
-    lines.append("### Macro Ranking (en/de)")
+    lines.append("### Macro Ranking")
     lines.append("")
     lines.append(
-        "| rank | model | macro recall@1 | macro recall@5 | macro mrr@10 | macro p50 latency (ms) | macro p95 latency (ms) | macro ingest (s) |"
+        "| rank | ranking_mode | model | macro recall@1 | macro recall@5 | macro mrr@10 | macro p50 latency (ms) | macro p95 latency (ms) | macro ingest (s) |"
     )
-    lines.append("|---:|---|---:|---:|---:|---:|---:|---:|")
+    lines.append("|---:|---|---|---:|---:|---:|---:|---:|---:|")
     for index, row in enumerate(report["aggregates"]["macro_ranking"], start=1):
         metric = row["macro_avg"]
         lines.append(
             "| "
-            f"{index} | {row['model']} | {metric['recall_at_1']:.4f} | {metric['recall_at_5']:.4f} | "
+            f"{index} | {row['ranking_mode']} | {row['model']} | {metric['recall_at_1']:.4f} | {metric['recall_at_5']:.4f} | "
             f"{metric['mrr_at_10']:.4f} | {metric['query_latency_ms_p50']:.2f} | "
             f"{metric['query_latency_ms_p95']:.2f} | {metric['ingest_seconds']:.2f} |"
         )
@@ -880,8 +973,7 @@ def build_results_markdown(report: dict[str, Any]) -> str:
         f"(metrics on `{settings['evaluation_split']}`)"
     )
     sampled_parts = [
-        f"{language}={sampled_by_language.get(language, 0)}"
-        for language in settings["languages"]
+        f"{language}={sampled_by_language.get(language, 0)}" for language in settings["languages"]
     ]
     lines.append(f"- Sample size (sampled queries): `{', '.join(sampled_parts)}`")
     eval_parts = [
@@ -897,6 +989,11 @@ def build_results_markdown(report: dict[str, Any]) -> str:
         f"`chunk_overlap={settings['chunk_overlap']}`"
     )
     lines.append(f"- Top-K: `{settings['top_k']}`")
+    lines.append(f"- Ranking modes: `{', '.join(settings['ranking_modes'])}`")
+    lines.append(f"- Rerank matrix mode: `{settings['rerank_matrix']}`")
+    if "rerank" in settings["ranking_modes"]:
+        lines.append(f"- Rerank model: `{settings['rerank_model']}`")
+        lines.append(f"- Rerank candidates: `{settings['rerank_candidates']}`")
     lines.append("")
     append_per_language_results(lines, report)
     append_macro_ranking(lines, report)
@@ -958,6 +1055,16 @@ def format_command_for_meta(args: argparse.Namespace) -> str:
         parts.append("--allow-model-download")
     else:
         parts.append("--no-allow-model-download")
+    if args.rerank_matrix:
+        parts.append("--rerank-matrix")
+    elif args.rerank:
+        parts.append("--rerank")
+    else:
+        parts.append("--no-rerank")
+    if args.rerank or args.rerank_matrix:
+        parts.extend(["--rerank-model", args.rerank_model])
+        if args.rerank_candidates is not None:
+            parts.extend(["--rerank-candidates", str(args.rerank_candidates)])
     return " ".join(shlex.quote(part) for part in parts)
 
 
@@ -970,13 +1077,14 @@ def detect_docctl_version() -> str:
         return "unknown"
 
 
-def main() -> None:
+def main() -> None:  # noqa: PLR0915
     """Run end-to-end benchmark, persist artifacts, and update docs snapshot."""
 
     args = parse_args()
     work_dir = args.work_dir if args.work_dir.is_absolute() else (REPO_ROOT / args.work_dir)
     work_dir.mkdir(parents=True, exist_ok=True)
     models = load_models(args.models_file)
+    ranking_modes = resolve_ranking_modes(rerank=args.rerank, rerank_matrix=args.rerank_matrix)
 
     language_query_splits: dict[str, dict[str, list[QuerySpec]]] = {}
     dataset_meta_languages: list[dict[str, Any]] = []
@@ -990,8 +1098,7 @@ def main() -> None:
         split_map = split_queries(queries=queries, language=language, seed=args.seed)
         language_query_splits[language] = split_map
         lang_meta["query_split_counts"] = {
-            split_name: len(split_queries_)
-            for split_name, split_queries_ in split_map.items()
+            split_name: len(split_queries_) for split_name, split_queries_ in split_map.items()
         }
         dataset_meta_languages.append(lang_meta)
 
@@ -1011,7 +1118,9 @@ def main() -> None:
         },
     }
     manifest_path = work_dir / "query_manifest.json"
-    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
 
     results: list[dict[str, Any]] = []
     for language in args.languages:
@@ -1033,32 +1142,47 @@ def main() -> None:
                 work_dir=work_dir,
                 config=ingest_config,
             )
-            responses, latencies_ms = query_session(
-                queries=queries,
-                model_name=model_name,
-                index_path=index_path,
-                top_k=args.top_k,
-                allow_model_download=args.allow_model_download,
-            )
-            metrics = score_metrics(
-                queries=queries,
-                responses=responses,
-                latencies_ms=latencies_ms,
-            )
-            results.append(
-                {
-                    "language": language,
-                    "model": model_name,
-                    "model_slug": slug,
-                    "evaluation_split": EVALUATION_SPLIT,
-                    "query_count": len(queries),
-                    "ingest_seconds": ingest_seconds,
-                    "ingest_summary": ingest_payload,
-                    "metrics": metrics,
-                }
-            )
+            for ranking_mode in ranking_modes:
+                print(
+                    f"[benchmark] language={language} model={model_name} ranking_mode={ranking_mode.key}",
+                    flush=True,
+                )
+                responses, latencies_ms = query_session(
+                    queries=queries,
+                    model_name=model_name,
+                    index_path=index_path,
+                    top_k=args.top_k,
+                    allow_model_download=args.allow_model_download,
+                    rerank=ranking_mode.rerank,
+                    rerank_candidates=args.rerank_candidates,
+                    rerank_model=args.rerank_model,
+                )
+                metrics = score_metrics(
+                    queries=queries,
+                    responses=responses,
+                    latencies_ms=latencies_ms,
+                )
+                results.append(
+                    {
+                        "language": language,
+                        "model": model_name,
+                        "model_slug": slug,
+                        "ranking_mode": ranking_mode.key,
+                        "rerank_enabled": ranking_mode.rerank,
+                        "evaluation_split": EVALUATION_SPLIT,
+                        "query_count": len(queries),
+                        "ingest_seconds": ingest_seconds,
+                        "ingest_summary": ingest_payload,
+                        "metrics": metrics,
+                    }
+                )
 
-    aggregates = summarize_aggregates(results=results, languages=args.languages, models=models)
+    aggregates = summarize_aggregates(
+        results=results,
+        languages=args.languages,
+        models=models,
+        ranking_modes=ranking_modes,
+    )
     timestamp_utc = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
     report = {
@@ -1088,6 +1212,11 @@ def main() -> None:
             "evaluation_split": EVALUATION_SPLIT,
             "models": models,
             "allow_model_download": args.allow_model_download,
+            "rerank": args.rerank,
+            "rerank_matrix": args.rerank_matrix,
+            "ranking_modes": [mode.key for mode in ranking_modes],
+            "rerank_model": args.rerank_model,
+            "rerank_candidates": args.rerank_candidates,
             "work_dir": str(work_dir),
         },
         "results": results,

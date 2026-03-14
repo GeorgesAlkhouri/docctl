@@ -3,6 +3,7 @@ from __future__ import annotations
 import runpy
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import typer
@@ -21,6 +22,28 @@ def _config(tmp_path: Path, *, json_output: bool = False, verbose: bool = False)
         embedding_model="model",
         require_write_approval=False,
     )
+
+
+def test_callback_sets_rerank_and_embedding_models(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("DOCCTL_EMBEDDING_MODEL", "embed-x")
+    monkeypatch.setenv("DOCCTL_RERANK_MODEL", "rerank-x")
+    monkeypatch.setenv("DOCCTL_REQUIRE_WRITE_APPROVAL", "1")
+    ctx = SimpleNamespace(obj=None)
+
+    cli.callback(
+        ctx=ctx,
+        index_path=tmp_path,
+        collection="c",
+        json_output=False,
+        verbose=False,
+    )
+
+    config = ctx.obj
+    assert config.embedding_model == "embed-x"
+    assert config.rerank_model == "rerank-x"
+    assert config.require_write_approval is True
 
 
 def test_emit_success_human_output_uses_key_value_lines(
@@ -122,6 +145,47 @@ def test_session_command_handles_runtime_exception(runner, monkeypatch: pytest.M
     result = runner.invoke(cli.app, ["session"], input='{"id":"x","op":"stats"}\n')
     assert result.exit_code == 50
     assert "session failed" in result.output
+
+
+def test_search_command_rejects_rerank_candidates_below_top_k(
+    runner, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(cli, "search_chunks", lambda **kwargs: {"hits": []})
+
+    result = runner.invoke(
+        cli.app,
+        ["search", "query", "--top-k", "5", "--rerank", "--rerank-candidates", "4"],
+    )
+    assert result.exit_code == 50
+    assert "invalid rerank candidate count" in result.output
+
+
+def test_search_command_returns_early_after_invalid_rerank_candidates(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    captured: dict[str, object] = {}
+
+    def _fake_handle_error(error: Exception) -> None:
+        captured["error"] = str(error)
+
+    monkeypatch.setattr(cli, "_handle_error", _fake_handle_error)
+    monkeypatch.setattr(
+        cli,
+        "search_chunks",
+        lambda **kwargs: (_ for _ in ()).throw(AssertionError("search should not execute")),
+    )
+
+    ctx = SimpleNamespace(obj=_config(tmp_path))
+    result = cli.search(
+        ctx=ctx,
+        query="query",
+        top_k=5,
+        rerank=True,
+        rerank_candidates=4,
+    )
+
+    assert result is None
+    assert "invalid rerank candidate count" in str(captured.get("error", ""))
 
 
 def test_main_invokes_typer_app(monkeypatch: pytest.MonkeyPatch) -> None:

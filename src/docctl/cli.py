@@ -16,8 +16,10 @@ from .config import (
     DEFAULT_COLLECTION,
     DEFAULT_EMBEDDING_MODEL,
     DEFAULT_INDEX_PATH,
+    DEFAULT_RERANK_MODEL,
     ENV_EMBEDDING_MODEL,
     ENV_REQUIRE_WRITE_APPROVAL,
+    ENV_RERANK_MODEL,
     CliConfig,
 )
 from .errors import DocctlError, EmbeddingConfigError, InternalDocctlError
@@ -39,7 +41,7 @@ app = typer.Typer(
     help="docctl is a CLI-first local document retrieval tool.",
 )
 
-ALLOW_MODEL_DOWNLOAD_HELP = "Allow downloading missing embedding model artifacts."
+ALLOW_MODEL_DOWNLOAD_HELP = "Allow downloading missing embedding/reranker model artifacts."
 
 
 def _emit_success(*, config: CliConfig, payload: dict[str, Any]) -> None:
@@ -115,6 +117,7 @@ def callback(
         verbose: Whether verbose diagnostics should be emitted.
     """
     embedding_model = os.getenv(ENV_EMBEDDING_MODEL, DEFAULT_EMBEDDING_MODEL)
+    rerank_model = os.getenv(ENV_RERANK_MODEL)
     require_write_approval = os.getenv(ENV_REQUIRE_WRITE_APPROVAL, "0") == "1"
 
     ctx.obj = CliConfig(
@@ -123,6 +126,7 @@ def callback(
         json_output=json_output,
         verbose=verbose,
         embedding_model=embedding_model,
+        rerank_model=rerank_model or DEFAULT_RERANK_MODEL,
         require_write_approval=require_write_approval,
     )
 
@@ -189,6 +193,18 @@ def search(
     min_score: float | None = typer.Option(
         None, "--min-score", min=0.0, max=1.0, help="Minimum score."
     ),
+    rerank: bool = typer.Option(
+        False,
+        "--rerank/--no-rerank",
+        help="Enable second-stage cross-encoder reranking.",
+    ),
+    rerank_candidates: int | None = typer.Option(
+        None,
+        "--rerank-candidates",
+        min=1,
+        max=100,
+        help="Candidate depth before reranking (must be >= --top-k).",
+    ),
     allow_model_download: bool = typer.Option(
         False,
         "--allow-model-download",
@@ -205,9 +221,19 @@ def search(
         source: Optional source path filter.
         title: Optional document title filter.
         min_score: Optional minimum score filter in [0.0, 1.0].
+        rerank: Whether reranking should run after vector retrieval.
+        rerank_candidates: Candidate count to rerank before trimming to `top_k`.
         allow_model_download: Whether missing embedding models may be downloaded.
     """
     config = ctx.obj
+    if rerank_candidates is not None and rerank_candidates < top_k:
+        _handle_error(
+            DocctlError(
+                message="invalid rerank candidate count: --rerank-candidates must be >= --top-k",
+                exit_code=50,
+            )
+        )
+        return
     try:
         with _machine_output_guard(enabled=config.json_output and not config.verbose):
             payload = search_chunks(
@@ -218,6 +244,8 @@ def search(
                 source=source,
                 title=title,
                 min_score=min_score,
+                rerank=rerank,
+                rerank_candidates=rerank_candidates,
                 allow_model_download=allow_model_download,
             )
         _emit_success(config=config, payload=payload)

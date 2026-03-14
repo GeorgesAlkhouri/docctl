@@ -16,7 +16,7 @@ from .models import ChunkRecord
 class EmbeddingFactory(Protocol):
     """Create an embedding function from CLI configuration values."""
 
-    def __call__(
+    def __call__(  # noqa: PLR0913
         self,
         *,
         model_name: str,
@@ -24,6 +24,26 @@ class EmbeddingFactory(Protocol):
         verbose: bool = False,
     ) -> EmbeddingFunction[Documents]:
         """Build and return an embedding function instance."""
+
+
+class Reranker(Protocol):
+    """Score query/text candidate pairs for second-stage ranking."""
+
+    def score(self, *, query: str, texts: list[str]) -> list[float]:
+        """Return one reranker score per candidate text."""
+
+
+class RerankerFactory(Protocol):
+    """Create a reranker from CLI configuration values."""
+
+    def __call__(
+        self,
+        *,
+        model_name: str,
+        allow_download: bool,
+        verbose: bool = False,
+    ) -> Reranker:
+        """Build and return a reranker instance."""
 
 
 class Store(Protocol):
@@ -72,6 +92,7 @@ class ServiceDependencies:
 
     embedding_factory: EmbeddingFactory
     store_factory: StoreFactory
+    reranker_factory: RerankerFactory | None = None
 
 
 @dataclass(slots=True, frozen=True)
@@ -99,6 +120,8 @@ class SearchRequest:
     title: str | None
     min_score: float | None
     allow_model_download: bool
+    rerank: bool = False
+    rerank_candidates: int | None = None
 
 
 @dataclass(slots=True, frozen=True)

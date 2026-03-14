@@ -66,6 +66,12 @@ class FakeEmbeddingFunction:
         return [self._vectorize(item) for item in input]
 
 
+class FakeReranker:
+    def score(self, *, query: str, texts: list[str]) -> list[float]:
+        _ = query
+        return [float(len(text)) for text in texts]
+
+
 @pytest.fixture()
 def runner() -> CliRunner:
     return CliRunner()
@@ -76,6 +82,14 @@ def patch_fake_embeddings(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "docctl.services.create_embedding_function",
         lambda model_name, allow_download, verbose=False: FakeEmbeddingFunction(),
+    )
+
+
+@pytest.fixture()
+def patch_fake_reranker(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "docctl.services.create_reranker",
+        lambda model_name, allow_download, verbose=False, **kwargs: FakeReranker(),
     )
 
 

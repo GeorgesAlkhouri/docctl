@@ -141,3 +141,23 @@ def parse_optional_float(
     if maximum is not None and parsed > maximum:
         raise DocctlError(message=f"invalid session request field '{field_name}'", exit_code=50)
     return parsed
+
+
+def parse_optional_bool(value: Any, *, field_name: str) -> bool | None:
+    """Validate a request field as optional bool.
+
+    Args:
+        value: Incoming request value.
+        field_name: Field label used in deterministic error messages.
+
+    Returns:
+        Parsed bool or `None` when field is omitted.
+
+    Raises:
+        DocctlError: If value is present but not a bool.
+    """
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    raise DocctlError(message=f"invalid session request field '{field_name}'", exit_code=50)

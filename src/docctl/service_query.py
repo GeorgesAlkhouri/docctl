@@ -5,10 +5,14 @@ from __future__ import annotations
 from dataclasses import asdict
 from typing import Any
 
-from .errors import ChunkNotFoundError, EmptyIndexSearchError
+from .config import CliConfig
+from .errors import ChunkNotFoundError, DocctlError, EmptyIndexSearchError, InternalDocctlError
 from .models import ChunkMetadata, ChunkRecord, SearchHit
-from .service_types import SearchRequest, ServiceDependencies, ShowRequest
+from .service_types import SearchRequest, ServiceDependencies, ShowRequest, Store
 from .text_sanitize import sanitize_text
+
+RERANK_DEFAULT_MIN_CANDIDATES = 5
+RERANK_MAX_CANDIDATES = 100
 
 
 def build_where_filter(
@@ -111,6 +115,133 @@ def search_hits_from_result(
     return hits
 
 
+def resolve_rerank_candidate_count(*, top_k: int, rerank_candidates: int | None) -> int:
+    """Resolve vector candidate depth used before second-stage reranking.
+
+    Args:
+        top_k: Final number of hits requested by caller.
+        rerank_candidates: Optional explicit candidate depth.
+
+    Returns:
+        Candidate count used for vector retrieval before reranking.
+
+    Raises:
+        DocctlError: If explicit candidate depth is smaller than `top_k`.
+    """
+    if rerank_candidates is None:
+        return min(max(top_k, RERANK_DEFAULT_MIN_CANDIDATES), RERANK_MAX_CANDIDATES)
+    if rerank_candidates < top_k:
+        raise DocctlError(
+            message="invalid rerank candidate count: rerank_candidates must be >= top_k",
+            exit_code=50,
+        )
+    return min(rerank_candidates, RERANK_MAX_CANDIDATES)
+
+
+def rerank_hits(  # noqa: PLR0913
+    *,
+    hits: list[dict[str, Any]],
+    query: str,
+    top_k: int,
+    config: CliConfig,
+    allow_model_download: bool,
+    deps: ServiceDependencies,
+) -> list[dict[str, Any]]:
+    """Apply second-stage reranking to vector candidates.
+
+    Args:
+        hits: Candidate hits from vector retrieval.
+        query: Query used for candidate retrieval.
+        top_k: Final result count.
+        config: Resolved CLI configuration.
+        allow_model_download: Whether missing model artifacts may be downloaded.
+        deps: Injected dependency seams.
+
+    Returns:
+        Reranked hit list trimmed to `top_k`.
+    """
+    if not hits:
+        return []
+
+    reranker_factory = deps.reranker_factory
+    if reranker_factory is None:
+        raise InternalDocctlError("reranker factory is not configured")
+
+    reranker = reranker_factory(
+        model_name=config.rerank_model,
+        allow_download=allow_model_download,
+        verbose=config.verbose,
+    )
+    scores = reranker.score(query=query, texts=[str(hit.get("text", "")) for hit in hits])
+    if len(scores) != len(hits):
+        raise InternalDocctlError("reranker returned an invalid score count")
+
+    enriched_hits: list[dict[str, Any]] = []
+    for index, (hit, rerank_score) in enumerate(zip(hits, scores, strict=True), start=1):
+        enriched = dict(hit)
+        enriched["vector_rank"] = index
+        enriched["rerank_score"] = float(rerank_score)
+        enriched_hits.append(enriched)
+
+    ordered = sorted(
+        enriched_hits,
+        key=lambda item: (-float(item["rerank_score"]), int(item["vector_rank"])),
+    )
+    final_hits = ordered[:top_k]
+    for rank, hit in enumerate(final_hits, start=1):
+        hit["rank"] = rank
+    return final_hits
+
+
+def search_hits(  # noqa: PLR0913
+    *,
+    store: Store,
+    query: str,
+    top_k: int,
+    where: dict[str, Any] | None,
+    min_score: float | None,
+    rerank: bool,
+    rerank_candidates: int | None,
+    config: CliConfig,
+    allow_model_download: bool,
+    deps: ServiceDependencies,
+) -> list[dict[str, Any]]:
+    """Search vector index and optionally apply second-stage reranking.
+
+    Args:
+        store: Collection-scoped storage adapter.
+        query: Natural-language query text.
+        top_k: Final number of hits to return.
+        where: Optional metadata filter.
+        min_score: Optional minimum vector similarity score threshold.
+        rerank: Whether second-stage reranking should run.
+        rerank_candidates: Optional candidate depth for rerank stage.
+        config: Resolved CLI configuration.
+        allow_model_download: Whether missing model artifacts may be downloaded.
+        deps: Injected dependency seams.
+
+    Returns:
+        Ranked search hits.
+    """
+    candidate_top_k = (
+        resolve_rerank_candidate_count(top_k=top_k, rerank_candidates=rerank_candidates)
+        if rerank
+        else top_k
+    )
+    result = store.query(query=query, top_k=candidate_top_k, where=where)
+    hits = search_hits_from_result(result=result, min_score=min_score)
+    if not rerank:
+        return hits[:top_k]
+    return rerank_hits(
+        hits=hits,
+        query=query,
+        top_k=top_k,
+        config=config,
+        allow_model_download=allow_model_download,
+        deps=deps,
+    )
+
+
 def search_chunks(*, request: SearchRequest, deps: ServiceDependencies) -> dict[str, object]:
     """Search indexed chunks with optional metadata filters.
 
@@ -145,8 +276,18 @@ def search_chunks(*, request: SearchRequest, deps: ServiceDependencies) -> dict[
         source=request.source,
         title=request.title,
     )
-    result = store.query(query=request.query, top_k=request.top_k, where=where)
-    hits = search_hits_from_result(result=result, min_score=request.min_score)
+    hits = search_hits(
+        store=store,
+        query=request.query,
+        top_k=request.top_k,
+        where=where,
+        min_score=request.min_score,
+        rerank=request.rerank,
+        rerank_candidates=request.rerank_candidates,
+        config=request.config,
+        allow_model_download=request.allow_model_download,
+        deps=deps,
+    )
 
     return {
         "collection": request.config.collection,
