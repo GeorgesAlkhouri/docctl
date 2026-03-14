@@ -60,7 +60,7 @@ dev = [
 ]
 
 [tool.uv.sources]
-torch = { index = "pytorch-cpu" }
+torch = { index = "pytorch-cpu", marker = "extra != 'gpu'" }
 
 [[tool.uv.index]]
 name = "pytorch-cpu"
