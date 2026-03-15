@@ -1,9 +1,9 @@
 ---
-name: "docctl-agent"
+name: "docctl"
 description: "Agent skill for docctl multi-format ingestion and provenance-grounded retrieval."
 ---
 
-# docctl Agent Skill
+# docctl Skill
 
 ## When to use
 - Use for document-grounded Q&A over local corpora (`.pdf`, `.docx`, `.txt`, `.md`).
@@ -15,12 +15,13 @@ description: "Agent skill for docctl multi-format ingestion and provenance-groun
   - `docctl ingest`, `search`, `show`, `stats`, `doctor`, and `session` orchestration.
   - Full lifecycle behavior: bootstrap ingest plus retrieval loops.
   - Metadata-constrained retrieval using `doc_id`, `source`, and `title`.
+  - Optional rerank controls and interpretation in retrieval workflows (`--rerank`, `--rerank-candidates`, session `rerank`, `rerank_candidates`).
 - Out of scope (agent-owned responsibilities):
   - Query rewriting and query decomposition.
   - Conversation context handling and prior-turn memory policy.
   - Project-specific instruction interpretation and policy reasoning.
   - Hybrid keyword/full-text retrieval design.
-  - Reranking implementation.
+  - Reranker model training/tuning and low-level scoring implementation.
 
 ## Inputs and assumptions
 - Expected inputs:
@@ -77,12 +78,13 @@ description: "Agent skill for docctl multi-format ingestion and provenance-groun
 - `search`:
   - Use for one-shot retrieval.
   - Do not chain multiple `search`/`show`/`stats`/`catalog` calls via separate tool invocations for the same workflow; switch to `session`.
-  - Relevant options: `--doc-id`, `--source`, `--title`, `--top-k`, `--min-score`.
+  - Relevant options: `--doc-id`, `--source`, `--title`, `--top-k`, `--min-score`, `--rerank`, `--rerank-candidates`.
+  - Rerank constraints: candidate depth must be in `[1, 100]` and greater than or equal to `top_k`.
 - `session`:
   - Use for iterative retrieval workflows.
   - Preferred default for multi-step work: keep one session open and submit all read operations (`search`, `show`, `stats`, `catalog`, `doctor`) as NDJSON lines.
   - Supported operations: `search`, `show`, `stats`, `catalog`, `doctor`.
-  - Search request accepts optional fields: `doc_id`, `source`, `title`, `top_k`, `min_score`.
+  - Search request accepts optional fields: `doc_id`, `source`, `title`, `top_k`, `min_score`, `rerank`, `rerank_candidates`.
 - `show`:
   - Use to inspect and quote exact chunk evidence by `chunk_id`.
 - `stats`:
@@ -161,5 +163,6 @@ EOF
   - rerun workflow checks after any meaningful change to this skill text.
 
 ## Accuracy note on ranking behavior
-- Current `docctl` retrieval ranking is vector-distance based.
-- Built-in reranking/hybrid retrieval is future work, not current behavior.
+- Default `docctl` retrieval ranking is vector-distance based when reranking is not enabled.
+- `docctl` supports opt-in two-stage reranking: vector retrieval for candidates, then local cross-encoder reranking.
+- When reranking is enabled, hits may include `vector_rank` and `rerank_score` in addition to base hit fields.
