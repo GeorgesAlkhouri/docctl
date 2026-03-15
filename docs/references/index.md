@@ -22,6 +22,10 @@ Curated authoritative sources used for implementation and operations decisions.
 | REF-0016 | Hugging Face Model Card: BAAI/bge-reranker-v2-m3 | primary project documentation | active | reranker model behavior and license |
 | REF-0017 | Chroma Query & Get Documentation | official vendor documentation | active | local collection query semantics |
 | REF-0018 | ChromaDB Go Client Rerankers | primary project documentation | active | confirms client-side rerank pattern, not python runtime contract |
+| REF-0019 | Dependabot Options Reference | official vendor documentation | active | schedule, groups, commit-message, and update volume controls |
+| REF-0020 | Automating Dependabot with GitHub Actions | official vendor documentation | active | metadata-driven conditional auto-merge automation |
+| REF-0021 | Dependency Review Action | official vendor documentation | active | pull request dependency risk gate for supply chain security |
+| REF-0022 | Supported Ecosystems for Dependabot and Dependency Graph | official vendor documentation | active | confirms `uv` and `github-actions` ecosystem support context |
 
 ## Source Quality Rule
 Use authoritative, professional sources (official vendor documentation,
