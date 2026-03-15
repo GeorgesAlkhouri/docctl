@@ -26,8 +26,19 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Detect repository auto-merge support
+        id: repo_settings
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "allow_auto_merge=$(gh api repos/${GITHUB_REPOSITORY} --jq '.allow_auto_merge')" >> "$GITHUB_OUTPUT"
+
+      - name: Skip auto-merge when repository setting is disabled
+        if: steps.repo_settings.outputs.allow_auto_merge != 'true'
+        run: echo "Repository auto-merge is disabled; skipping merge enablement."
+
       - name: Enable auto-merge for patch GitHub Actions updates
         if: >
+          steps.repo_settings.outputs.allow_auto_merge == 'true' &&
           steps.metadata.outputs.package-ecosystem == 'github_actions' &&
           steps.metadata.outputs.update-type == 'version-update:semver-patch'
         env:
@@ -37,6 +48,7 @@ jobs:
 
       - name: Enable auto-merge for patch development dependency updates
         if: >
+          steps.repo_settings.outputs.allow_auto_merge == 'true' &&
           steps.metadata.outputs.package-ecosystem == 'uv' &&
           steps.metadata.outputs.update-type == 'version-update:semver-patch' &&
           steps.metadata.outputs.dependency-type == 'direct:development'
