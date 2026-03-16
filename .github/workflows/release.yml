@@ -8,6 +8,22 @@ on:
         required: false
         default: false
         type: boolean
+      force_bump:
+        description: "Optional semantic-release bump override"
+        required: false
+        default: auto
+        type: choice
+        options:
+          - auto
+          - patch
+          - minor
+          - major
+          - prerelease
+      as_prerelease:
+        description: "Convert patch/minor/major override into a prerelease"
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: release-${{ github.ref }}
@@ -62,8 +78,36 @@ jobs:
 
       - name: Preview next release
         if: inputs.dry_run
-        run: uv run semantic-release --strict --noop version --print
+        env:
+          FORCE_BUMP: ${{ inputs.force_bump }}
+          AS_PRERELEASE: ${{ inputs.as_prerelease }}
+        run: |
+          cmd=(uv run semantic-release --strict --noop version --print)
+
+          if [[ "${FORCE_BUMP}" != "auto" ]]; then
+            cmd+=("--${FORCE_BUMP}")
+          fi
+
+          if [[ "${AS_PRERELEASE}" == "true" ]]; then
+            cmd+=("--as-prerelease")
+          fi
+
+          "${cmd[@]}"
 
       - name: Create release commit, tag, and GitHub Release
         if: ${{ !inputs.dry_run }}
-        run: uv run semantic-release --strict -v version
+        env:
+          FORCE_BUMP: ${{ inputs.force_bump }}
+          AS_PRERELEASE: ${{ inputs.as_prerelease }}
+        run: |
+          cmd=(uv run semantic-release --strict -v version)
+
+          if [[ "${FORCE_BUMP}" != "auto" ]]; then
+            cmd+=("--${FORCE_BUMP}")
+          fi
+
+          if [[ "${AS_PRERELEASE}" == "true" ]]; then
+            cmd+=("--as-prerelease")
+          fi
+
+          "${cmd[@]}"

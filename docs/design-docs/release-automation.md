@@ -14,7 +14,8 @@ GitHub releases, and PyPI publication deterministic and auditable.
 - Keep Dependabot commit prefixes on `chore(...)` paths so dependency update
   merges do not auto-bump semantic versions.
 - Require a manual `workflow_dispatch` release workflow on `main` for release
-  creation.
+  creation, with optional semantic-release bump overrides when maintainers
+  need to publish outside automatic version bump detection.
 - Require a repository secret named `RELEASE_TOKEN` for the release workflow so
   automation can push the semantic-release commit and tag under the
   repository's pull-request-only branch rules.
@@ -36,17 +37,27 @@ GitHub releases, and PyPI publication deterministic and auditable.
    packaging surfaces.
    - Markdown link checks stay in the regular CI workflow and are not part of
      the release-cutting job.
-6. Semantic-release updates `pyproject.toml`, `CHANGELOG.md`, and `uv.lock`,
-   creates a release commit and tag, pushes them, and opens a published
-   GitHub Release.
-7. The `Publish PyPI` workflow rebuilds artifacts from the release tag, runs
+6. Maintainers can optionally provide a `force_bump` input (`patch`, `minor`,
+   `major`, `prerelease`, or the default `auto`) to override semantic-release
+   bump selection when needed.
+7. Maintainers can optionally set `as_prerelease` to convert a forced
+   `patch`/`minor`/`major` override into a prerelease target.
+8. The workflow supports combining `dry_run` with override inputs so maintainers
+   can preview forced release outcomes before publishing.
+9. The workflow runs semantic-release with the selected overrides, then
+   semantic-release updates `pyproject.toml`,
+   `CHANGELOG.md`, and `uv.lock`, creates a release commit and tag, pushes
+   them, and opens a published GitHub Release.
+10. The `Publish PyPI` workflow rebuilds artifacts from the release tag, runs
    `twine check`, publishes to TestPyPI, and then publishes to PyPI after
    environment approval.
 
 ## Rationale
 - Dependency freshness improves while preserving explicit release control.
 - Auto-merge is constrained to low-risk patch classes to reduce regression risk.
-- Release creation remains explicit and auditable.
+- Release creation remains explicit and auditable, including emergency
+  forced semantic-release bump overrides, while still allowing dry-run previews
+  before publication.
 - PyPI credentials stay isolated to the publish workflow.
 - Trusted Publishing removes token rotation burden and narrows credential risk.
 - Building from the release tag ensures published artifacts match the tagged
