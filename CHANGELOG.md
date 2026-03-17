@@ -1,6 +1,15 @@
 # CHANGELOG
 
 
+## v0.2.2 (2026-03-17)
+
+### Bug Fixes
+
+- **packaging**: Remove gpu extra and cpu torch index wiring
+  ([#29](https://github.com/GeorgesAlkhouri/docctl/pull/29),
+  [`c10c488`](https://github.com/GeorgesAlkhouri/docctl/commit/c10c48893980c8d8ecf52f96f697a3df4540664f))
+
+
 ## v0.2.1 (2026-03-16)
 
 ### Bug Fixes
