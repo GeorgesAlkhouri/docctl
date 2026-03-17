@@ -59,19 +59,16 @@ Requirements:
 # 1) Install from PyPI
 pip install docctl
 
-# 2) Optional: install GPU-linked torch dependencies (Linux x86_64)
-pip install --upgrade "docctl[gpu]"
-
-# 3) Verify CLI
+# 2) Verify CLI
 docctl --help
 
-# 4) Ingest supported files
+# 3) Ingest supported files
 docctl ingest ./docs --recursive --approve-write --allow-model-download
 
-# 5) Search indexed content
+# 4) Search indexed content
 docctl search "security gateway diagnostics" --top-k 5 --allow-model-download
 
-# 6) Show one chunk by id (replace with an id from search output)
+# 5) Show one chunk by id (replace with an id from search output)
 docctl show <chunk_id_from_search> --allow-model-download
 ```
 
