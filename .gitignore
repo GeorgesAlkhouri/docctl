@@ -8,3 +8,7 @@ coverage.xml
 build/
 *.egg-info/
 benchmarks/embedding_eval/.work/
+.direnv/
+.devenv/
+.env
+.docctl*/

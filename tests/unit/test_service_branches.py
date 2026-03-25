@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 
-from docctl import service_doctor, service_ingest, service_session
+from docctl import service_doctor, service_ingest, service_session, services
 from docctl.config import CliConfig
 from docctl.errors import (
     DocctlError,
@@ -559,3 +559,39 @@ def test_build_where_filter_returns_doc_id_only_mapping() -> None:
         source=None,
         title=None,
     ) == {"doc_id": "d1"}
+
+
+def test_services_export_and_import_snapshot_delegate(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    config = _config(tmp_path)
+    export_calls: dict[str, object] = {}
+    import_calls: dict[str, object] = {}
+
+    def _fake_export_impl(*, request):  # noqa: ANN001
+        export_calls["request"] = request
+        return {"ok": True}
+
+    def _fake_import_impl(*, request):  # noqa: ANN001
+        import_calls["request"] = request
+        return {"ok": True}
+
+    monkeypatch.setattr(services, "export_snapshot_impl", _fake_export_impl)
+    monkeypatch.setattr(services, "import_snapshot_impl", _fake_import_impl)
+
+    export_payload = services.export_snapshot(
+        config=config,
+        archive_path=tmp_path / "snapshot.zip",
+    )
+    import_payload = services.import_snapshot(
+        config=config,
+        archive_path=tmp_path / "snapshot.zip",
+        replace=True,
+        approve_write=True,
+    )
+
+    assert export_payload == {"ok": True}
+    assert import_payload == {"ok": True}
+    export_request = export_calls["request"]
+    import_request = import_calls["request"]
+    assert getattr(export_request, "archive_path") == tmp_path / "snapshot.zip"
+    assert getattr(import_request, "replace") is True
+    assert getattr(import_request, "approve_write") is True

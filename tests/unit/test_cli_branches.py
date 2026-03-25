@@ -207,3 +207,27 @@ def test_module_main_guard_executes(monkeypatch: pytest.MonkeyPatch) -> None:
     finally:
         if existing is not None:
             sys.modules["docctl.cli"] = existing
+
+
+def test_export_command_handles_runtime_exception(runner, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        cli,
+        "export_snapshot",
+        lambda **kwargs: (_ for _ in ()).throw(RuntimeError("export failed")),
+    )
+
+    result = runner.invoke(cli.app, ["export", "snapshot.zip"])
+    assert result.exit_code == 50
+    assert "export failed" in result.output
+
+
+def test_import_command_handles_runtime_exception(runner, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        cli,
+        "import_snapshot",
+        lambda **kwargs: (_ for _ in ()).throw(RuntimeError("import failed")),
+    )
+
+    result = runner.invoke(cli.app, ["import", "snapshot.zip", "--approve-write"])
+    assert result.exit_code == 50
+    assert "import failed" in result.output

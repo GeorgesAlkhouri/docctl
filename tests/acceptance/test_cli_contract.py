@@ -9,6 +9,8 @@ def test_commands_exist() -> None:
 
     assert result.exit_code == 0
     assert "ingest" in result.output
+    assert "export" in result.output
+    assert "import" in result.output
     assert "search" in result.output
     assert "show" in result.output
     assert "stats" in result.output

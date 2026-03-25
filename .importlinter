@@ -24,6 +24,7 @@ forbidden_modules =
     docctl.service_manifest
     docctl.service_query
     docctl.service_session
+    docctl.service_snapshot
     docctl.service_types
     docctl.services
 
@@ -43,6 +44,7 @@ forbidden_modules =
     docctl.service_manifest
     docctl.service_query
     docctl.service_session
+    docctl.service_snapshot
     docctl.service_types
     docctl.services
 
@@ -55,6 +57,7 @@ source_modules =
     docctl.service_manifest
     docctl.service_query
     docctl.service_session
+    docctl.service_snapshot
     docctl.service_types
     docctl.services
 forbidden_modules =

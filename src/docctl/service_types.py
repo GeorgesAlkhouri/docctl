@@ -148,3 +148,21 @@ class SessionStreamRequest:
     config: CliConfig
     request_lines: Iterable[str]
     allow_model_download: bool
+
+
+@dataclass(slots=True, frozen=True)
+class ExportRequest:
+    """Inputs required for one export command execution."""
+
+    config: CliConfig
+    archive_path: Path
+
+
+@dataclass(slots=True, frozen=True)
+class ImportRequest:
+    """Inputs required for one import command execution."""
+
+    config: CliConfig
+    archive_path: Path
+    replace: bool
+    approve_write: bool
