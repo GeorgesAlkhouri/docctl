@@ -506,6 +506,15 @@ class _ClientSocketStub:
         return self._writer
 
 
+class _TimeoutClientSocketStub(_ClientSocketStub):
+    def __init__(self, reader: _ReaderStub, writer: _WriterStub) -> None:
+        super().__init__(reader, writer)
+        self.timeouts: list[float | None] = []
+
+    def settimeout(self, timeout: float | None) -> None:
+        self.timeouts.append(timeout)
+
+
 def test_send_requests_over_socket_handles_blank_and_closed_connection(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -534,6 +543,23 @@ def test_send_requests_over_socket_handles_blank_and_closed_connection(
             socket_path=tmp_path / "sock",
             request_lines=['{"id":"x","op":"stats"}'],
         )
+
+
+def test_send_requests_over_socket_sets_blocking_after_connect(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    reader = _ReaderStub(lines=['{"id":"x","ok":true,"result":{}}\n'])
+    writer = _WriterStub()
+    client = _TimeoutClientSocketStub(reader, writer)
+    monkeypatch.setattr(session_worker.socket, "socket", lambda *args, **kwargs: client)
+
+    responses = session_worker._send_requests_over_socket(
+        socket_path=tmp_path / "sock",
+        request_lines=['{"id":"x","op":"stats"}'],
+    )
+
+    assert responses == [{"id": "x", "ok": True, "result": {}}]
+    assert client.timeouts == [session_worker.SESSION_CONNECT_TIMEOUT_SECONDS, None]
 
 
 def test_parse_worker_response_validation_errors() -> None:
@@ -757,6 +783,101 @@ def test_serve_connection_and_update_last_used_state(
     assert used is True
     assert stop_requested is True
     assert any("stopping" in value for value in control_writer.buffer)
+
+
+def test_serve_connection_handles_broken_pipe_without_crashing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    reader = _ReaderStub(lines=['{"id":"x","op":"stats"}\n'])
+
+    class _BrokenPipeWriter:
+        def __init__(self) -> None:
+            self.buffer: list[str] = []
+            self.closed = False
+
+        def write(self, value: str) -> None:
+            self.buffer.append(value)
+
+        def flush(self) -> None:
+            raise BrokenPipeError("client disconnected")
+
+        def close(self) -> None:
+            self.closed = True
+            raise BrokenPipeError("client disconnected")
+
+    writer = _BrokenPipeWriter()
+
+    class _Connection:
+        def makefile(self, mode: str, encoding: str):  # noqa: ANN001, ANN201
+            _ = encoding
+            return reader if mode == "r" else writer
+
+    monkeypatch.setattr(
+        session_worker,
+        "run_session_request_line",
+        lambda **kwargs: {"id": "x", "ok": True, "result": {}},
+    )
+
+    used, stop_requested = session_worker._serve_connection(
+        connection=_Connection(),
+        runtime=object(),
+        verbose=False,
+    )
+
+    assert used is True
+    assert stop_requested is False
+    assert reader.closed is True
+    assert writer.closed is True
+
+
+def test_serve_connection_control_stop_handles_broken_pipe_ack(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _ = monkeypatch
+    reader = _ReaderStub(
+        lines=[
+            json.dumps(
+                {
+                    "id": session_worker.SESSION_CONTROL_STOP_ID,
+                    "op": session_worker.SESSION_CONTROL_STOP_OP,
+                }
+            )
+            + "\n"
+        ]
+    )
+
+    class _BrokenPipeWriter:
+        def __init__(self) -> None:
+            self.buffer: list[str] = []
+            self.closed = False
+
+        def write(self, value: str) -> None:
+            self.buffer.append(value)
+
+        def flush(self) -> None:
+            raise BrokenPipeError("client disconnected")
+
+        def close(self) -> None:
+            self.closed = True
+            raise BrokenPipeError("client disconnected")
+
+    writer = _BrokenPipeWriter()
+
+    class _Connection:
+        def makefile(self, mode: str, encoding: str):  # noqa: ANN001, ANN201
+            _ = encoding
+            return reader if mode == "r" else writer
+
+    used, stop_requested = session_worker._serve_connection(
+        connection=_Connection(),
+        runtime=object(),
+        verbose=False,
+    )
+
+    assert used is True
+    assert stop_requested is True
+    assert reader.closed is True
+    assert writer.closed is True
 
 
 def test_run_worker_process_setsid_and_delegates(

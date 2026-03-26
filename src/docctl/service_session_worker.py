@@ -575,6 +575,9 @@ def _send_requests_over_socket(
     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
         client.settimeout(SESSION_CONNECT_TIMEOUT_SECONDS)
         client.connect(str(socket_path))
+        # Only bound the connect phase; request handling may legitimately take longer
+        # (for example first-use model warm-up) and should not fail at transport layer.
+        client.settimeout(None)
         reader = client.makefile("r", encoding="utf-8")
         writer = client.makefile("w", encoding="utf-8")
         try:
@@ -683,33 +686,50 @@ def _serve_connection(
     try:
         for raw_line in reader:
             if _is_control_stop_request(raw_line=raw_line):
-                writer.write(
-                    json.dumps(
-                        {
-                            "id": SESSION_CONTROL_STOP_ID,
-                            "ok": True,
-                            "result": {"status": "stopping"},
-                        },
-                        sort_keys=True,
-                        separators=(",", ":"),
-                    )
-                )
-                writer.write("\n")
-                writer.flush()
                 used_connection = True
                 stop_requested = True
+                if not _write_worker_response_line(
+                    writer=writer,
+                    payload={
+                        "id": SESSION_CONTROL_STOP_ID,
+                        "ok": True,
+                        "result": {"status": "stopping"},
+                    },
+                ):
+                    break
                 break
             response = run_session_request_line(runtime=runtime, raw_line=raw_line, verbose=verbose)
             if response is None:
                 continue
-            writer.write(json.dumps(response, sort_keys=True, separators=(",", ":")))
-            writer.write("\n")
-            writer.flush()
             used_connection = True
+            if not _write_worker_response_line(writer=writer, payload=response):
+                break
     finally:
-        reader.close()
-        writer.close()
+        with suppress(OSError):
+            reader.close()
+        with suppress(OSError):
+            writer.close()
     return used_connection, stop_requested
+
+
+def _write_worker_response_line(*, writer: Any, payload: dict[str, Any]) -> bool:
+    """Write one NDJSON response line to the worker socket stream.
+
+    Args:
+        writer: Text writer bound to a socket stream.
+        payload: Response payload to serialize.
+
+    Returns:
+        `True` when the response is written and flushed successfully, otherwise
+        `False` when the peer disconnected.
+    """
+    try:
+        writer.write(json.dumps(payload, sort_keys=True, separators=(",", ":")))
+        writer.write("\n")
+        writer.flush()
+    except OSError:
+        return False
+    return True
 
 
 def _is_control_stop_request(*, raw_line: str) -> bool:
