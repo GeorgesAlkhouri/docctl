@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import multiprocessing
 import os
-import signal
 import socket
 import tempfile
 import time
@@ -27,6 +26,8 @@ SESSION_SCHEMA_VERSION = 1
 SESSION_START_TIMEOUT_SECONDS = 10.0
 SESSION_STOP_TIMEOUT_SECONDS = 5.0
 SESSION_CONNECT_TIMEOUT_SECONDS = 5.0
+SESSION_CONTROL_STOP_ID = "__session_worker_stop__"
+SESSION_CONTROL_STOP_OP = "__control_stop__"
 SESSION_STATE_FILENAME = "session-state.json"
 SESSION_LOCK_FILENAME = "session.lock"
 SESSION_SOCKET_FILENAME = "session.sock"
@@ -158,7 +159,11 @@ def stop_session_worker() -> dict[str, object]:
         if state is None:
             _clear_artifacts_locked(artifacts=artifacts)
             return _stopped_payload()
-        _terminate_pid(pid=state.pid, timeout_seconds=SESSION_STOP_TIMEOUT_SECONDS)
+        _request_worker_shutdown(socket_path=Path(state.socket_path))
+        _wait_for_socket_shutdown(
+            socket_path=Path(state.socket_path),
+            timeout_seconds=SESSION_STOP_TIMEOUT_SECONDS,
+        )
         _clear_artifacts_locked(artifacts=artifacts)
     return _stopped_payload()
 
@@ -244,7 +249,6 @@ def serve_session_worker(  # noqa: PLR0913
         allow_model_download=allow_model_download,
     )
     runtime = SessionRuntime(request=session_request, deps=deps)
-    last_used = time.time()
 
     server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     try:
@@ -252,33 +256,53 @@ def serve_session_worker(  # noqa: PLR0913
         os.chmod(socket_path, 0o600)
         server.listen()
         server.settimeout(1.0)
-        while True:
-            if time.time() - last_used >= idle_ttl_seconds:
-                break
-            try:
-                connection, _ = server.accept()
-            except TimeoutError:
-                continue
-            except OSError:
-                break
-            with connection:
-                used_connection = _serve_connection(
-                    connection=connection,
-                    runtime=runtime,
-                    verbose=config.verbose,
-                )
-            if used_connection:
-                last_used = time.time()
-                _update_last_used_state(
-                    state_path=state_path,
-                    pid=os.getpid(),
-                    idle_ttl_seconds=idle_ttl_seconds,
-                    last_used=last_used,
-                )
+        _serve_worker_loop(
+            server=server,
+            runtime=runtime,
+            verbose=config.verbose,
+            state_path=state_path,
+            idle_ttl_seconds=idle_ttl_seconds,
+        )
     finally:
         server.close()
         _safe_unlink(path=socket_path)
         _safe_remove_state_if_owned(path=state_path, pid=os.getpid())
+
+
+def _serve_worker_loop(  # noqa: PLR0913
+    *,
+    server: socket.socket,
+    runtime: SessionRuntime,
+    verbose: bool,
+    state_path: Path,
+    idle_ttl_seconds: int,
+) -> None:
+    last_used = time.time()
+    while True:
+        if time.time() - last_used >= idle_ttl_seconds:
+            break
+        try:
+            connection, _ = server.accept()
+        except TimeoutError:
+            continue
+        except OSError:
+            break
+        with connection:
+            used_connection, stop_requested = _serve_connection(
+                connection=connection,
+                runtime=runtime,
+                verbose=verbose,
+            )
+        if used_connection:
+            last_used = time.time()
+            _update_last_used_state(
+                state_path=state_path,
+                pid=os.getpid(),
+                idle_ttl_seconds=idle_ttl_seconds,
+                last_used=last_used,
+            )
+        if stop_requested:
+            break
 
 
 def _require_posix() -> None:
@@ -346,7 +370,7 @@ def _load_running_state_locked(*, artifacts: SessionArtifacts) -> SessionState |
     if state is None:
         _safe_unlink(path=artifacts.socket_path)
         return None
-    if _pid_is_running(pid=state.pid) and _socket_reachable(path=Path(state.socket_path)):
+    if _socket_reachable(path=Path(state.socket_path)):
         return state
     _clear_artifacts_locked(artifacts=artifacts)
     return None
@@ -433,7 +457,11 @@ def _start_worker_locked(  # noqa: PLR0913
     _write_state(path=artifacts.state_path, state=state)
     if _wait_for_socket_ready(process=process, socket_path=artifacts.socket_path):
         return state
-    _terminate_pid(pid=process.pid, timeout_seconds=SESSION_STOP_TIMEOUT_SECONDS)
+    _request_worker_shutdown(socket_path=artifacts.socket_path)
+    _wait_for_socket_shutdown(
+        socket_path=artifacts.socket_path,
+        timeout_seconds=SESSION_STOP_TIMEOUT_SECONDS,
+    )
     _clear_artifacts_locked(artifacts=artifacts)
     raise InternalDocctlError("session worker failed to start")
 
@@ -508,6 +536,36 @@ def _wait_for_socket_ready(
     return False
 
 
+def _request_worker_shutdown(*, socket_path: Path) -> None:
+    if not _socket_reachable(path=socket_path):
+        return
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
+            client.settimeout(SESSION_CONNECT_TIMEOUT_SECONDS)
+            client.connect(str(socket_path))
+            reader = client.makefile("r", encoding="utf-8")
+            writer = client.makefile("w", encoding="utf-8")
+            try:
+                payload = {"id": SESSION_CONTROL_STOP_ID, "op": SESSION_CONTROL_STOP_OP}
+                writer.write(json.dumps(payload, sort_keys=True, separators=(",", ":")))
+                writer.write("\n")
+                writer.flush()
+                _ = reader.readline()
+            finally:
+                reader.close()
+                writer.close()
+    except OSError:
+        return
+
+
+def _wait_for_socket_shutdown(*, socket_path: Path, timeout_seconds: float) -> None:
+    deadline = time.time() + timeout_seconds
+    while time.time() < deadline:
+        if not _socket_reachable(path=socket_path):
+            return
+        time.sleep(0.05)
+
+
 def _send_requests_over_socket(
     *,
     socket_path: Path,
@@ -579,16 +637,6 @@ def _stopped_payload() -> dict[str, object]:
     return {"status": "stopped"}
 
 
-def _pid_is_running(*, pid: int) -> bool:
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
-    return True
-
-
 def _socket_reachable(*, path: Path) -> bool:
     if not path.exists():
         return False
@@ -599,24 +647,6 @@ def _socket_reachable(*, path: Path) -> bool:
         return True
     except OSError:
         return False
-
-
-def _terminate_pid(*, pid: int, timeout_seconds: float) -> None:
-    if not _pid_is_running(pid=pid):
-        return
-    try:
-        os.kill(pid, signal.SIGTERM)
-    except ProcessLookupError:
-        return
-    deadline = time.time() + timeout_seconds
-    while time.time() < deadline:
-        if not _pid_is_running(pid=pid):
-            return
-        time.sleep(0.05)
-    try:
-        os.kill(pid, signal.SIGKILL)
-    except ProcessLookupError:
-        return
 
 
 def _clear_artifacts_locked(*, artifacts: SessionArtifacts) -> None:
@@ -645,12 +675,30 @@ def _serve_connection(
     connection: socket.socket,
     runtime: SessionRuntime,
     verbose: bool,
-) -> bool:
+) -> tuple[bool, bool]:
     used_connection = False
+    stop_requested = False
     reader = connection.makefile("r", encoding="utf-8")
     writer = connection.makefile("w", encoding="utf-8")
     try:
         for raw_line in reader:
+            if _is_control_stop_request(raw_line=raw_line):
+                writer.write(
+                    json.dumps(
+                        {
+                            "id": SESSION_CONTROL_STOP_ID,
+                            "ok": True,
+                            "result": {"status": "stopping"},
+                        },
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    )
+                )
+                writer.write("\n")
+                writer.flush()
+                used_connection = True
+                stop_requested = True
+                break
             response = run_session_request_line(runtime=runtime, raw_line=raw_line, verbose=verbose)
             if response is None:
                 continue
@@ -661,7 +709,23 @@ def _serve_connection(
     finally:
         reader.close()
         writer.close()
-    return used_connection
+    return used_connection, stop_requested
+
+
+def _is_control_stop_request(*, raw_line: str) -> bool:
+    line = raw_line.strip()
+    if not line:
+        return False
+    try:
+        payload = json.loads(line)
+    except json.JSONDecodeError:
+        return False
+    if not isinstance(payload, dict):
+        return False
+    return (
+        payload.get("id") == SESSION_CONTROL_STOP_ID
+        and payload.get("op") == SESSION_CONTROL_STOP_OP
+    )
 
 
 def _update_last_used_state(

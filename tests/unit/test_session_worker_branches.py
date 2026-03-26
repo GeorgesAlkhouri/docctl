@@ -223,7 +223,7 @@ def test_serve_session_worker_updates_last_used_on_handled_connection(
     monkeypatch.setattr(session_worker.time, "time", lambda: next(time_values))
     monkeypatch.setattr(session_worker, "_safe_unlink", lambda **kwargs: None)
     monkeypatch.setattr(session_worker, "_safe_remove_state_if_owned", lambda **kwargs: None)
-    monkeypatch.setattr(session_worker, "_serve_connection", lambda **kwargs: True)
+    monkeypatch.setattr(session_worker, "_serve_connection", lambda **kwargs: (True, False))
     monkeypatch.setattr(
         session_worker,
         "_update_last_used_state",
@@ -284,6 +284,36 @@ def test_serve_session_worker_exits_on_idle_timeout_without_accept(
     assert cleanup_calls["remove_state"] == 1
 
 
+def test_serve_worker_loop_breaks_when_stop_requested(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    server = _ServerStub(events=[_ConnStub()])
+    updates: dict[str, int] = {"count": 0}
+    time_values = iter([0.0, 0.1, 0.2])
+
+    monkeypatch.setattr(session_worker.time, "time", lambda: next(time_values))
+    monkeypatch.setattr(
+        session_worker,
+        "_serve_connection",
+        lambda **kwargs: (True, True),
+    )
+    monkeypatch.setattr(
+        session_worker,
+        "_update_last_used_state",
+        lambda **kwargs: updates.__setitem__("count", updates["count"] + 1),
+    )
+
+    session_worker._serve_worker_loop(
+        server=server,
+        runtime=object(),
+        verbose=False,
+        state_path=tmp_path / "state.json",
+        idle_ttl_seconds=10,
+    )
+
+    assert updates["count"] == 1
+
+
 def test_load_running_state_clears_stale_worker(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -297,7 +327,7 @@ def test_load_running_state_clears_stale_worker(
     cleared: dict[str, int] = {"count": 0}
 
     monkeypatch.setattr(session_worker, "_read_state", lambda **kwargs: stale_state)
-    monkeypatch.setattr(session_worker, "_pid_is_running", lambda **kwargs: False)
+    monkeypatch.setattr(session_worker, "_socket_reachable", lambda **kwargs: False)
     monkeypatch.setattr(
         session_worker,
         "_clear_artifacts_locked",
@@ -372,15 +402,20 @@ def test_start_worker_locked_handles_start_timeout(
         rerank_model="rerank",
         allow_model_download=False,
     )
-    calls: dict[str, int] = {"term": 0, "clear": 0}
+    calls: dict[str, int] = {"shutdown": 0, "wait": 0, "clear": 0}
     process = _ProcessStub(pid=33)
 
     monkeypatch.setattr(session_worker, "_start_worker_process", lambda **kwargs: process)
     monkeypatch.setattr(session_worker, "_wait_for_socket_ready", lambda **kwargs: False)
     monkeypatch.setattr(
         session_worker,
-        "_terminate_pid",
-        lambda **kwargs: calls.__setitem__("term", calls["term"] + 1),
+        "_request_worker_shutdown",
+        lambda **kwargs: calls.__setitem__("shutdown", calls["shutdown"] + 1),
+    )
+    monkeypatch.setattr(
+        session_worker,
+        "_wait_for_socket_shutdown",
+        lambda **kwargs: calls.__setitem__("wait", calls["wait"] + 1),
     )
     monkeypatch.setattr(
         session_worker,
@@ -397,7 +432,7 @@ def test_start_worker_locked_handles_start_timeout(
             allow_model_download=False,
             deps=_deps(),
         )
-    assert calls == {"term": 1, "clear": 1}
+    assert calls == {"shutdown": 1, "wait": 1, "clear": 1}
 
 
 def test_wait_for_socket_ready_dead_or_timeout(
@@ -508,19 +543,7 @@ def test_parse_worker_response_validation_errors() -> None:
         session_worker._parse_worker_response(line='["not-a-dict"]')
 
 
-def test_pid_and_socket_helpers_error_branches(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    monkeypatch.setattr(
-        session_worker.os, "kill", lambda pid, signal: (_ for _ in ()).throw(ProcessLookupError)
-    )
-    assert session_worker._pid_is_running(pid=1) is False
-
-    monkeypatch.setattr(
-        session_worker.os, "kill", lambda pid, signal: (_ for _ in ()).throw(PermissionError)
-    )
-    assert session_worker._pid_is_running(pid=1) is True
-
+def test_socket_reachable_error_branch(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     socket_path = tmp_path / "s.sock"
     socket_path.write_text("x", encoding="utf-8")
 
@@ -543,41 +566,76 @@ def test_pid_and_socket_helpers_error_branches(
     assert session_worker._socket_reachable(path=socket_path) is False
 
 
-def test_terminate_pid_branch_coverage(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(session_worker, "_pid_is_running", lambda **kwargs: False)
-    session_worker._terminate_pid(pid=1, timeout_seconds=0.1)
+def test_request_worker_shutdown_returns_when_socket_unreachable(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    socket_path = tmp_path / "worker.sock"
 
-    monkeypatch.setattr(session_worker, "_pid_is_running", lambda **kwargs: True)
+    monkeypatch.setattr(session_worker, "_socket_reachable", lambda **kwargs: False)
+    session_worker._request_worker_shutdown(socket_path=socket_path)
+
+
+def test_request_worker_shutdown_ignores_socket_errors(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    socket_path = tmp_path / "worker.sock"
+    monkeypatch.setattr(session_worker, "_socket_reachable", lambda **kwargs: True)
+
+    class _FailingSocket:
+        def __enter__(self):  # noqa: ANN204
+            return self
+
+        def __exit__(self, exc_type, exc, tb):  # noqa: ANN001, ANN201
+            _ = (exc_type, exc, tb)
+            return False
+
+        def settimeout(self, timeout: float) -> None:
+            _ = timeout
+
+        def connect(self, path: str) -> None:
+            _ = path
+            raise OSError("cannot connect")
+
+    monkeypatch.setattr(session_worker.socket, "socket", lambda *args, **kwargs: _FailingSocket())
+    session_worker._request_worker_shutdown(socket_path=socket_path)
+
+
+def test_request_worker_shutdown_sends_control_message(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    socket_path = tmp_path / "worker.sock"
+    monkeypatch.setattr(session_worker, "_socket_reachable", lambda **kwargs: True)
+    reader = _ReaderStub(lines=['{"id":"x","ok":true}\n'])
+    writer = _WriterStub()
     monkeypatch.setattr(
-        session_worker.os,
-        "kill",
-        lambda pid, sig: (
-            (_ for _ in ()).throw(ProcessLookupError)
-            if sig == session_worker.signal.SIGTERM
-            else None
-        ),
+        session_worker.socket,
+        "socket",
+        lambda *args, **kwargs: _ClientSocketStub(reader, writer),
     )
-    session_worker._terminate_pid(pid=1, timeout_seconds=0.1)
+    session_worker._request_worker_shutdown(socket_path=socket_path)
+    serialized = "".join(writer.buffer)
+    assert session_worker.SESSION_CONTROL_STOP_OP in serialized
 
-    run_states = iter([True, False])
-    monkeypatch.setattr(session_worker, "_pid_is_running", lambda **kwargs: next(run_states))
-    monkeypatch.setattr(session_worker.os, "kill", lambda pid, sig: None)
+
+def test_wait_for_socket_shutdown_returns_on_disconnect(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    socket_path = tmp_path / "worker.sock"
+    states = iter([True, False])
+    monkeypatch.setattr(session_worker, "_socket_reachable", lambda **kwargs: next(states))
     monkeypatch.setattr(session_worker.time, "time", lambda: 0.0)
     monkeypatch.setattr(session_worker.time, "sleep", lambda _delay: None)
-    session_worker._terminate_pid(pid=1, timeout_seconds=1.0)
+    session_worker._wait_for_socket_shutdown(socket_path=socket_path, timeout_seconds=1.0)
 
-    monkeypatch.setattr(session_worker, "_pid_is_running", lambda **kwargs: True)
+
+def test_wait_for_socket_shutdown_times_out(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    socket_path = tmp_path / "worker.sock"
     time_values = iter([0.0, 0.1, 2.0])
     monkeypatch.setattr(session_worker.time, "time", lambda: next(time_values))
-    monkeypatch.setattr(session_worker.time, "sleep", lambda _delay: None)
-
-    def _kill_with_sigkill_lookup(pid: int, sig: int) -> None:
-        _ = pid
-        if sig == session_worker.signal.SIGKILL:
-            raise ProcessLookupError
-
-    monkeypatch.setattr(session_worker.os, "kill", _kill_with_sigkill_lookup)
-    session_worker._terminate_pid(pid=1, timeout_seconds=1.0)
+    monkeypatch.setattr(session_worker, "_socket_reachable", lambda **kwargs: True)
+    session_worker._wait_for_socket_shutdown(socket_path=socket_path, timeout_seconds=1.0)
 
 
 def test_safe_unlink_and_safe_remove_state_if_owned(
@@ -628,12 +686,13 @@ def test_serve_connection_and_update_last_used_state(
         lambda **kwargs: next(responses),
     )
 
-    used = session_worker._serve_connection(
+    used, stop_requested = session_worker._serve_connection(
         connection=_Connection(),
         runtime=object(),
         verbose=False,
     )
     assert used is True
+    assert stop_requested is False
     assert writer.closed is True
     assert reader.closed is True
     assert any('"ok":true' in part for part in writer.buffer)
@@ -672,6 +731,33 @@ def test_serve_connection_and_update_last_used_state(
     assert "state" in writes
     assert writes["state"].last_used_at == "2026-01-01T00:00:01+00:00"
 
+    control_reader = _ReaderStub(
+        lines=[
+            json.dumps(
+                {
+                    "id": session_worker.SESSION_CONTROL_STOP_ID,
+                    "op": session_worker.SESSION_CONTROL_STOP_OP,
+                }
+            )
+            + "\n"
+        ]
+    )
+    control_writer = _WriterStub()
+
+    class _ControlConnection:
+        def makefile(self, mode: str, encoding: str):  # noqa: ANN001, ANN201
+            _ = encoding
+            return control_reader if mode == "r" else control_writer
+
+    used, stop_requested = session_worker._serve_connection(
+        connection=_ControlConnection(),
+        runtime=object(),
+        verbose=False,
+    )
+    assert used is True
+    assert stop_requested is True
+    assert any("stopping" in value for value in control_writer.buffer)
+
 
 def test_run_worker_process_setsid_and_delegates(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
@@ -700,3 +786,8 @@ def test_run_worker_process_setsid_and_delegates(
     )
 
     assert calls == {"setsid": 1, "serve": 1}
+
+
+def test_is_control_stop_request_invalid_payloads() -> None:
+    assert session_worker._is_control_stop_request(raw_line="not-json\n") is False
+    assert session_worker._is_control_stop_request(raw_line='["x"]\n') is False
