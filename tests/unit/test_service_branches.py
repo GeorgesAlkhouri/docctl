@@ -592,6 +592,6 @@ def test_services_export_and_import_snapshot_delegate(tmp_path: Path, monkeypatc
     assert import_payload == {"ok": True}
     export_request = export_calls["request"]
     import_request = import_calls["request"]
-    assert getattr(export_request, "archive_path") == tmp_path / "snapshot.zip"
-    assert getattr(import_request, "replace") is True
-    assert getattr(import_request, "approve_write") is True
+    assert export_request.archive_path == tmp_path / "snapshot.zip"
+    assert import_request.replace is True
+    assert import_request.approve_write is True

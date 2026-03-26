@@ -15,10 +15,10 @@ from .service_doctor import run_doctor as run_doctor_impl
 from .service_ingest import ingest_path as ingest_path_impl
 from .service_manifest import catalog_documents, load_manifest, manifest_documents
 from .service_query import search_chunks as search_chunks_impl
-from .service_snapshot import export_snapshot as export_snapshot_impl
-from .service_snapshot import import_snapshot as import_snapshot_impl
 from .service_query import show_chunk as show_chunk_impl
 from .service_session import run_session_requests as run_session_requests_impl
+from .service_snapshot import export_snapshot as export_snapshot_impl
+from .service_snapshot import import_snapshot as import_snapshot_impl
 from .service_types import (
     DoctorRequest,
     ExportRequest,
