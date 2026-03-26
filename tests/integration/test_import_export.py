@@ -10,7 +10,9 @@ def _json(output: str) -> dict:
     return json.loads(output.strip())
 
 
-def test_export_import_round_trip_json(runner, make_pdf, patch_fake_embeddings, tmp_path: Path) -> None:
+def test_export_import_round_trip_json(
+    runner, make_pdf, patch_fake_embeddings, tmp_path: Path
+) -> None:
     pdf_path = make_pdf(
         tmp_path / "docs" / "roundtrip.pdf",
         ["Round-trip retrieval sentence one.", "Round-trip retrieval sentence two."],

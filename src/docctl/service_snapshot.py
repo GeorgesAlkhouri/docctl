@@ -66,7 +66,9 @@ def _ensure_export_source(index_path: Path) -> None:
         )
 
     if not manifest_path(index_path).exists():
-        raise IndexNotInitializedError("index manifest is missing; run `docctl ingest <path>` first")
+        raise IndexNotInitializedError(
+            "index manifest is missing; run `docctl ingest <path>` first"
+        )
 
     chroma_path = index_path / _CHROMA_DIRNAME
     if not chroma_path.exists() or not chroma_path.is_dir():
@@ -90,7 +92,9 @@ def export_snapshot(*, request: ExportRequest) -> dict[str, object]:
     request.archive_path.parent.mkdir(parents=True, exist_ok=True)
 
     files = sorted(path for path in request.config.index_path.rglob("*") if path.is_file())
-    with zipfile.ZipFile(request.archive_path, mode="w", compression=zipfile.ZIP_DEFLATED) as archive:
+    with zipfile.ZipFile(
+        request.archive_path, mode="w", compression=zipfile.ZIP_DEFLATED
+    ) as archive:
         for file_path in files:
             relative_path = file_path.relative_to(request.config.index_path)
             archive.write(file_path, arcname=str(relative_path))
@@ -155,7 +159,10 @@ def _safe_extract_archive(*, archive: zipfile.ZipFile, target_root: Path) -> int
             continue
 
         destination.parent.mkdir(parents=True, exist_ok=True)
-        with archive.open(member, mode="r") as source_handle, destination.open("wb") as target_handle:
+        with (
+            archive.open(member, mode="r") as source_handle,
+            destination.open("wb") as target_handle,
+        ):
             shutil.copyfileobj(source_handle, target_handle)
         extracted_files += 1
 

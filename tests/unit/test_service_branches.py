@@ -561,7 +561,9 @@ def test_build_where_filter_returns_doc_id_only_mapping() -> None:
     ) == {"doc_id": "d1"}
 
 
-def test_services_export_and_import_snapshot_delegate(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_services_export_and_import_snapshot_delegate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     config = _config(tmp_path)
     export_calls: dict[str, object] = {}
     import_calls: dict[str, object] = {}
