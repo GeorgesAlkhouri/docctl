@@ -1,6 +1,21 @@
 # CHANGELOG
 
 
+## v0.3.1 (2026-03-26)
+
+### Chores
+
+- **deps)(deps**: Bump the uv-security group across 1 directory with 4 updates
+  ([#34](https://github.com/GeorgesAlkhouri/docctl/pull/34),
+  [`780bf69`](https://github.com/GeorgesAlkhouri/docctl/commit/780bf69c900e34e49eac0281758f1059c6711318))
+
+### Refactoring
+
+- **services**: Isolate ML imports from startup-light CLI paths
+  ([#33](https://github.com/GeorgesAlkhouri/docctl/pull/33),
+  [`8667fc4`](https://github.com/GeorgesAlkhouri/docctl/commit/8667fc436712f02c54b10c75ec19ed053ccb9648))
+
+
 ## v0.3.0 (2026-03-26)
 
 ### Bug Fixes
