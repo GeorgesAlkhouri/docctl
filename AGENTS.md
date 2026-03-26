@@ -54,12 +54,40 @@ This repository is agent-first and documentation-indexed for `docctl`.
 - If checks fail, MUST use failure output to revise and rerun the loop.
 - If checks pass, MAY perform behavior-preserving refactors; MUST rerun checks
   after refactors.
+- During interactive loops, run fast tests first. Run longer acceptance/E2E
+  checks at the end of implementation before handoff.
 - Python test framework in this repository is `pytest`.
 - Commits intended for `main` MUST use the Conventional Commits format
   (`type(scope): summary` or `type: summary`) so semantic-release can derive
   versions and changelog entries deterministically.
 - All programming artifacts MUST be in English: identifiers, modules, classes,
   functions, comments, log/error messages, CLI flags, and JSON keys.
+
+### Integration Test Requirement Policy
+- Scope definitions to avoid ambiguity:
+  - Integration tests (`tests/integration/`) verify interfaces and interactions
+    between integrated components/systems for a workflow slice.
+  - Acceptance/E2E smoke tests (`tests/acceptance/`) verify the system is
+    acceptable for a small set of top-level user/CLI journeys.
+- At least one integration test MUST be added or updated when a change has any
+  of these impact triggers:
+  - new user-visible behavior,
+  - CLI contract change,
+  - cross-module workflow/orchestration change,
+  - persistence or serialization contract change (`--json` payloads, NDJSON
+    session behavior, snapshot/import-export behavior, manifest shape, or exit
+    code mapping),
+  - significant bug fix that changes runtime behavior across module boundaries.
+- Pure internal refactors that preserve externally observable behavior do not
+  require new integration tests.
+- Temporary exceptions are allowed only when both are present:
+  - explicit rationale in the active execution plan,
+  - tracked follow-up item in `docs/exec-plans/tech-debt-tracker.md` (or an
+    equivalent plan artifact) to add the missing integration coverage.
+- Default validation order for feature work:
+  - run fast unit tests first during implementation loops,
+  - run impacted integration tests before handoff,
+  - run the small acceptance/E2E smoke suite at the end.
 
 ### Docstring Quality Policy
 - Public Python modules, classes, functions, and methods MUST include
