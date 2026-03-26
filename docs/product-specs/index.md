@@ -5,4 +5,4 @@ Sorted by `id` ascending.
 
 | id | title | status | owner | last_updated | path |
 |---|---|---|---|---|---|
-| PSPEC-0001 | CLI Contract v3 (Multi-Format Ingest, Locator-Free Retrieval) | active | Engineering | 2026-03-25 | docs/product-specs/cli-contract.md |
+| PSPEC-0001 | CLI Contract v3 (Multi-Format Ingest, Locator-Free Retrieval) | active | Engineering | 2026-03-26 | docs/product-specs/cli-contract.md |

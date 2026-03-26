@@ -11,6 +11,12 @@
 - `docctl doctor`
 - `docctl session`
 
+## Command Import Boundaries
+- Set A (ML-capable command path): `ingest`, `search`, `doctor`, `session`.
+- Set B (startup-light command path): `show`, `stats`, `catalog`, `export`, `import`.
+- `--help` paths (`docctl --help` and `docctl <command> --help`) MUST remain startup-light.
+- Set B commands MUST NOT require embedding/reranker/chunking dependency wiring to run.
+
 ## Ingest Inputs
 - Supported ingest file extensions: `.pdf`, `.docx`, `.txt`, `.md`.
 - Directory ingest discovers supported files that match `--glob` (default `*`).

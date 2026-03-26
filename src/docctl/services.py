@@ -7,12 +7,10 @@ from pathlib import Path
 from typing import Any
 
 from .config import CliConfig
-from .embeddings import create_embedding_function
+from .errors import InternalDocctlError
 from .index_store import ChromaStore
 from .models import DoctorReport
-from .reranking import create_reranker
 from .service_doctor import run_doctor as run_doctor_impl
-from .service_ingest import ingest_path as ingest_path_impl
 from .service_manifest import catalog_documents, load_manifest, manifest_documents
 from .service_query import search_chunks as search_chunks_impl
 from .service_query import show_chunk as show_chunk_impl
@@ -31,11 +29,86 @@ from .service_types import (
 )
 
 
-def _dependencies() -> ServiceDependencies:
-    """Resolve injectable runtime dependencies.
+def create_embedding_function(
+    *, model_name: str, allow_download: bool, verbose: bool = False
+) -> Any:
+    """Create embedding function via lazy module import.
+
+    Args:
+        model_name: SentenceTransformer model identifier.
+        allow_download: Whether missing model assets may be downloaded.
+        verbose: Whether verbose diagnostics are enabled.
 
     Returns:
-        Dependency bundle used by internal service submodules.
+        Embedding function compatible with Chroma query/upsert APIs.
+    """
+    from .embeddings import create_embedding_function as create_embedding_function_impl
+
+    return create_embedding_function_impl(
+        model_name=model_name,
+        allow_download=allow_download,
+        verbose=verbose,
+    )
+
+
+def create_reranker(*, model_name: str, allow_download: bool, verbose: bool = False) -> Any:
+    """Create reranker via lazy module import.
+
+    Args:
+        model_name: Cross-encoder model identifier.
+        allow_download: Whether missing model assets may be downloaded.
+        verbose: Whether verbose diagnostics are enabled.
+
+    Returns:
+        Reranker instance used for second-stage ranking.
+    """
+    from .reranking import create_reranker as create_reranker_impl
+
+    return create_reranker_impl(
+        model_name=model_name,
+        allow_download=allow_download,
+        verbose=verbose,
+    )
+
+
+def _unsupported_embedding_factory(
+    *,
+    model_name: str,
+    allow_download: bool,
+    verbose: bool = False,
+) -> Any:
+    """Guard against embedding use in read-only dependency bundles.
+
+    Args:
+        model_name: Unused model identifier.
+        allow_download: Unused download flag.
+        verbose: Unused verbosity flag.
+
+    Raises:
+        InternalDocctlError: Always raised when this placeholder is called.
+    """
+    _ = (model_name, allow_download, verbose)
+    raise InternalDocctlError("embedding factory is unavailable for read-only operations")
+
+
+def _readonly_dependencies() -> ServiceDependencies:
+    """Resolve dependencies required for read-only operations.
+
+    Returns:
+        Dependency bundle with store access and disabled embedding/rerank factories.
+    """
+    return ServiceDependencies(
+        embedding_factory=_unsupported_embedding_factory,
+        store_factory=ChromaStore,
+        reranker_factory=None,
+    )
+
+
+def _ml_dependencies() -> ServiceDependencies:
+    """Resolve dependencies required for ML-capable operations.
+
+    Returns:
+        Dependency bundle used by ingest/search/doctor/session operations.
     """
     return ServiceDependencies(
         embedding_factory=create_embedding_function,
@@ -68,6 +141,8 @@ def ingest_path(  # noqa: PLR0913
     Returns:
         Summary payload describing ingested, skipped, and failed documents.
     """
+    from .service_ingest import ingest_path as ingest_path_impl
+
     request = IngestRequest(
         config=config,
         input_path=input_path,
@@ -77,7 +152,7 @@ def ingest_path(  # noqa: PLR0913
         approve_write=approve_write,
         allow_model_download=allow_model_download,
     )
-    return ingest_path_impl(request=request, deps=_dependencies())
+    return ingest_path_impl(request=request, deps=_ml_dependencies())
 
 
 def search_chunks(  # noqa: PLR0913
@@ -122,7 +197,7 @@ def search_chunks(  # noqa: PLR0913
         rerank=rerank,
         rerank_candidates=rerank_candidates,
     )
-    return search_chunks_impl(request=request, deps=_dependencies())
+    return search_chunks_impl(request=request, deps=_ml_dependencies())
 
 
 def show_chunk(
@@ -143,7 +218,7 @@ def show_chunk(
         chunk_id=chunk_id,
         allow_model_download=allow_model_download,
     )
-    return show_chunk_impl(request=request, deps=_dependencies())
+    return show_chunk_impl(request=request, deps=_readonly_dependencies())
 
 
 def collect_stats(*, config: CliConfig) -> dict[str, object]:
@@ -227,7 +302,7 @@ def run_session_requests(
         request_lines=request_lines,
         allow_model_download=allow_model_download,
     )
-    return run_session_requests_impl(request=request, deps=_dependencies())
+    return run_session_requests_impl(request=request, deps=_ml_dependencies())
 
 
 def run_doctor(*, config: CliConfig, allow_model_download: bool) -> DoctorReport:
@@ -241,7 +316,7 @@ def run_doctor(*, config: CliConfig, allow_model_download: bool) -> DoctorReport
         Structured doctor report with checks, warnings, and errors.
     """
     request = DoctorRequest(config=config, allow_model_download=allow_model_download)
-    return run_doctor_impl(request=request, deps=_dependencies())
+    return run_doctor_impl(request=request, deps=_ml_dependencies())
 
 
 def export_snapshot(*, config: CliConfig, archive_path: Path) -> dict[str, object]:
