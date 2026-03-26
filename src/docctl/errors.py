@@ -37,6 +37,13 @@ class EmptyExtractedTextError(DocctlError):
         super().__init__(message=message, exit_code=12)
 
 
+class SnapshotArchiveError(DocctlError):
+    """Raise when snapshot archive paths or archive content are invalid."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message=message, exit_code=13)
+
+
 class IndexNotInitializedError(DocctlError):
     """Raise when expected index artifacts are missing from disk."""
 
@@ -49,6 +56,13 @@ class WriteApprovalRequiredError(DocctlError):
 
     def __init__(self, message: str) -> None:
         super().__init__(message=message, exit_code=21)
+
+
+class SnapshotConflictError(DocctlError):
+    """Raise when importing would overwrite an existing index path."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message=message, exit_code=22)
 
 
 class EmptyIndexSearchError(DocctlError):

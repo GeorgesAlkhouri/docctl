@@ -150,3 +150,77 @@ def test_stats_on_uninitialized_index_exit_code_20_has_actionable_message(
     assert "index is not initialized" in output
     assert "run `docctl ingest <path>` first" in output
     assert "--index-path" in output
+
+
+def test_export_invalid_archive_extension_exit_code_13(runner, tmp_path: Path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "--index-path",
+            str(tmp_path / "index"),
+            "--collection",
+            "test",
+            "--json",
+            "export",
+            str(tmp_path / "snapshot.tar"),
+        ],
+    )
+
+    assert result.exit_code == 13
+    assert "must end with .zip" in result.output
+
+
+def test_import_conflict_without_replace_exit_code_22(
+    runner, make_pdf, patch_fake_embeddings, tmp_path: Path
+) -> None:
+    pdf_path = make_pdf(tmp_path / "doc.pdf", ["Import conflict check sentence."])
+    source_index = tmp_path / "source-index"
+    target_index = tmp_path / "target-index"
+    archive_path = tmp_path / "snapshot.zip"
+
+    ingest_result = runner.invoke(
+        app,
+        [
+            "--index-path",
+            str(source_index),
+            "--collection",
+            "test",
+            "--json",
+            "ingest",
+            str(pdf_path),
+        ],
+    )
+    assert ingest_result.exit_code == 0, ingest_result.output
+
+    export_result = runner.invoke(
+        app,
+        [
+            "--index-path",
+            str(source_index),
+            "--collection",
+            "test",
+            "--json",
+            "export",
+            str(archive_path),
+        ],
+    )
+    assert export_result.exit_code == 0, export_result.output
+
+    target_index.mkdir(parents=True, exist_ok=True)
+
+    result = runner.invoke(
+        app,
+        [
+            "--index-path",
+            str(target_index),
+            "--collection",
+            "test",
+            "--json",
+            "import",
+            str(archive_path),
+            "--approve-write",
+        ],
+    )
+
+    assert result.exit_code == 22
+    assert "--replace" in result.output

@@ -2,6 +2,8 @@
 
 ## Commands
 - `docctl ingest <path>`
+- `docctl export <archive_path>`
+- `docctl import <archive_path>`
 - `docctl search <query>`
 - `docctl show <chunk_id>`
 - `docctl stats`
@@ -13,6 +15,14 @@
 - Supported ingest file extensions: `.pdf`, `.docx`, `.txt`, `.md`.
 - Directory ingest discovers supported files that match `--glob` (default `*`).
 - Single-file ingest rejects unsupported extensions.
+
+## Snapshot Import/Export
+- `docctl export <archive_path>` writes one `.zip` file containing current index artifacts.
+- `docctl export` requires initialized index artifacts (`manifest.json` and `chroma/`).
+- `docctl import <archive_path>` accepts `.zip` files only.
+- `docctl import` is mutating and supports `--replace` to overwrite existing `--index-path`.
+- Without `--replace`, import fails when `--index-path` already exists.
+- Import enforces safe extraction (rejects unsafe archive member paths and symlinks).
 
 ## Search Filters
 - `docctl search` supports optional metadata filters:

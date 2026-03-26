@@ -17,8 +17,12 @@ from .service_manifest import catalog_documents, load_manifest, manifest_documen
 from .service_query import search_chunks as search_chunks_impl
 from .service_query import show_chunk as show_chunk_impl
 from .service_session import run_session_requests as run_session_requests_impl
+from .service_snapshot import export_snapshot as export_snapshot_impl
+from .service_snapshot import import_snapshot as import_snapshot_impl
 from .service_types import (
     DoctorRequest,
+    ExportRequest,
+    ImportRequest,
     IngestRequest,
     SearchRequest,
     ServiceDependencies,
@@ -238,3 +242,44 @@ def run_doctor(*, config: CliConfig, allow_model_download: bool) -> DoctorReport
     """
     request = DoctorRequest(config=config, allow_model_download=allow_model_download)
     return run_doctor_impl(request=request, deps=_dependencies())
+
+
+def export_snapshot(*, config: CliConfig, archive_path: Path) -> dict[str, object]:
+    """Export current index artifacts to one zip archive.
+
+    Args:
+        config: Resolved CLI configuration.
+        archive_path: Destination zip archive path.
+
+    Returns:
+        Export summary payload.
+    """
+    request = ExportRequest(config=config, archive_path=archive_path)
+    return export_snapshot_impl(request=request)
+
+
+def import_snapshot(  # noqa: PLR0913
+    *,
+    config: CliConfig,
+    archive_path: Path,
+    replace: bool,
+    approve_write: bool,
+) -> dict[str, object]:
+    """Import index artifacts from one zip archive.
+
+    Args:
+        config: Resolved CLI configuration.
+        archive_path: Source zip archive path.
+        replace: Whether existing index path should be overwritten.
+        approve_write: Explicit user approval for mutating writes.
+
+    Returns:
+        Import summary payload.
+    """
+    request = ImportRequest(
+        config=config,
+        archive_path=archive_path,
+        replace=replace,
+        approve_write=approve_write,
+    )
+    return import_snapshot_impl(request=request)

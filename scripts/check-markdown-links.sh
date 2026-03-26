@@ -10,7 +10,7 @@ set --
 while IFS= read -r file; do
   set -- "$@" "$file"
 done <<EOF_FILES
-$(find . -type f -name '*.md' -not -path './.git/*' -not -path './.venv/*' -not -path './.pytest_cache/*' | sort)
+$(find . -type f -name '*.md' -not -path './.git/*' -not -path './.venv/*' -not -path './.devenv/*' -not -path './.pytest_cache/*' | sort)
 EOF_FILES
 
 if [ "$#" -eq 0 ]; then

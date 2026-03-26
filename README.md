@@ -76,6 +76,8 @@ docctl show <chunk_id_from_search> --allow-model-download
 | Command | Purpose |
 |---|---|
 | `docctl ingest <path>` | Ingest one supported file or a directory of supported files (mutates local index state). |
+| `docctl export <archive_path>` | Export current index data to one `.zip` snapshot file. |
+| `docctl import <archive_path>` | Import index data from one `.zip` snapshot file (mutating). |
 | `docctl search <query>` | Search indexed content with optional metadata filters. |
 | `docctl show <chunk_id>` | Show one indexed chunk by exact id. |
 | `docctl stats` | Show index statistics. |
@@ -110,8 +112,9 @@ Model downloads are explicit:
 - Use `--allow-model-download` when embedding artifacts are not already available.
 
 Mutation boundaries:
-- `ingest` is mutating.
+- `ingest` and `import` are mutating.
 - `search`, `show`, `stats`, `catalog`, `doctor`, and `session` are read-only.
+- `export` is read-only.
 
 ## Development
 Run core quality checks:

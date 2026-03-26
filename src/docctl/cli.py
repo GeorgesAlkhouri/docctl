@@ -28,6 +28,8 @@ from .models import DoctorReport
 from .services import (
     collect_catalog,
     collect_stats,
+    export_snapshot,
+    import_snapshot,
     ingest_path,
     run_doctor,
     run_session_requests,
@@ -335,6 +337,61 @@ def doctor(
         _emit_doctor(config=config, report=report)
         if not report.ok:
             raise EmbeddingConfigError("doctor checks failed")
+    except Exception as error:  # noqa: BLE001
+        _handle_error(error)
+
+
+@app.command(help="Export current local index data into one zip snapshot file.")
+def export(
+    ctx: typer.Context,
+    archive_path: Path = typer.Argument(..., help="Destination .zip snapshot archive path."),
+) -> None:
+    """Export current index artifacts into one zip snapshot archive.
+
+    Args:
+        ctx: Typer context containing resolved configuration.
+        archive_path: Destination snapshot archive path.
+    """
+    config = ctx.obj
+    try:
+        payload = export_snapshot(config=config, archive_path=archive_path)
+        _emit_success(config=config, payload=payload)
+    except Exception as error:  # noqa: BLE001
+        _handle_error(error)
+
+
+@app.command(name="import", help="Import local index data from one zip snapshot file.")
+def import_(
+    ctx: typer.Context,
+    archive_path: Path = typer.Argument(..., help="Source .zip snapshot archive path."),
+    replace: bool = typer.Option(
+        False,
+        "--replace",
+        help="Replace an existing --index-path before restoring snapshot data.",
+    ),
+    approve_write: bool = typer.Option(
+        False,
+        "--approve-write",
+        help="Explicitly approve mutating writes.",
+    ),
+) -> None:
+    """Import index artifacts from one zip snapshot archive.
+
+    Args:
+        ctx: Typer context containing resolved configuration.
+        archive_path: Source snapshot archive path.
+        replace: Whether existing index path should be overwritten.
+        approve_write: Explicit write approval for mutating operations.
+    """
+    config = ctx.obj
+    try:
+        payload = import_snapshot(
+            config=config,
+            archive_path=archive_path,
+            replace=replace,
+            approve_write=approve_write,
+        )
+        _emit_success(config=config, payload=payload)
     except Exception as error:  # noqa: BLE001
         _handle_error(error)
 
