@@ -175,6 +175,20 @@ def test_session_exec_command_handles_runtime_exception(
     assert "session exec failed" in result.output
 
 
+def test_session_status_command_handles_runtime_exception(
+    runner, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        cli,
+        "session_worker_status",
+        lambda **kwargs: (_ for _ in ()).throw(RuntimeError("session status failed")),
+    )
+
+    result = runner.invoke(cli.app, ["session", "status"])
+    assert result.exit_code == 50
+    assert "session status failed" in result.output
+
+
 def test_session_stop_command_handles_runtime_exception(
     runner, monkeypatch: pytest.MonkeyPatch
 ) -> None:
