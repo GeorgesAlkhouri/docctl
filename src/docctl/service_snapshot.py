@@ -186,7 +186,7 @@ def _resolve_snapshot_root(extract_root: Path) -> Path:
     if manifest_file.exists() and chroma_dir.is_dir():
         return extract_root
 
-    children = [entry for entry in extract_root.iterdir()]
+    children = list(extract_root.iterdir())
     if len(children) == 1 and children[0].is_dir():
         nested_root = children[0]
         nested_manifest = nested_root / "manifest.json"
