@@ -62,3 +62,18 @@ source_modules =
     docctl.services
 forbidden_modules =
     docctl.cli
+
+[importlinter:contract:startup-light-modules-avoid-ml-stack]
+name = Startup-light modules avoid ML stack imports
+type = forbidden
+source_modules =
+    docctl.service_doctor
+    docctl.service_manifest
+    docctl.service_query
+    docctl.service_session
+    docctl.service_snapshot
+forbidden_modules =
+    docctl.chunking
+    docctl.embeddings
+    docctl.reranking
+    docctl.service_ingest

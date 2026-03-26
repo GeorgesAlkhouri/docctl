@@ -597,3 +597,42 @@ def test_services_export_and_import_snapshot_delegate(
     assert export_request.archive_path == tmp_path / "snapshot.zip"
     assert import_request.replace is True
     assert import_request.approve_write is True
+
+
+def test_services_create_reranker_lazy_wrapper_delegates(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: dict[str, object] = {}
+    marker = object()
+
+    def _fake_create_reranker(*, model_name: str, allow_download: bool, verbose: bool) -> object:
+        calls["model_name"] = model_name
+        calls["allow_download"] = allow_download
+        calls["verbose"] = verbose
+        return marker
+
+    monkeypatch.setattr("docctl.reranking.create_reranker", _fake_create_reranker)
+
+    result = services.create_reranker(
+        model_name="rerank-model",
+        allow_download=True,
+        verbose=True,
+    )
+
+    assert result is marker
+    assert calls == {
+        "model_name": "rerank-model",
+        "allow_download": True,
+        "verbose": True,
+    }
+
+
+def test_readonly_dependencies_embedding_factory_raises_internal_error() -> None:
+    deps = services._readonly_dependencies()
+
+    with pytest.raises(InternalDocctlError, match="read-only operations"):
+        deps.embedding_factory(
+            model_name="model",
+            allow_download=False,
+            verbose=False,
+        )
