@@ -20,6 +20,9 @@ Primary runtime code lives in `src/docctl/`.
 - `service_ingest.py`, `service_query.py`, `service_session.py`, `service_doctor.py`
   - Internal orchestration modules split by workflow domain.
   - Own command execution logic for ingest/query/session/doctor flows.
+- `service_session_worker.py`
+  - Singleton detached session worker lifecycle and local IPC transport orchestration.
+  - Reuses `service_session.py` request dispatch/runtime handling.
 - `service_snapshot.py`
   - Snapshot orchestration for index export/import workflows.
   - Owns zip archive validation, safe extraction, and restore policy enforcement.

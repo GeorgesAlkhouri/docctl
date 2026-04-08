@@ -147,6 +147,62 @@ def test_session_command_handles_runtime_exception(runner, monkeypatch: pytest.M
     assert "session failed" in result.output
 
 
+def test_session_start_command_handles_runtime_exception(
+    runner, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        cli,
+        "start_session_worker",
+        lambda **kwargs: (_ for _ in ()).throw(RuntimeError("session start failed")),
+    )
+
+    result = runner.invoke(cli.app, ["session", "start"])
+    assert result.exit_code == 50
+    assert "session start failed" in result.output
+
+
+def test_session_exec_command_handles_runtime_exception(
+    runner, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        cli,
+        "exec_session_requests",
+        lambda **kwargs: (_ for _ in ()).throw(RuntimeError("session exec failed")),
+    )
+
+    result = runner.invoke(cli.app, ["session", "exec"], input='{"id":"x","op":"stats"}\n')
+    assert result.exit_code == 50
+    assert "session exec failed" in result.output
+
+
+def test_session_status_command_handles_runtime_exception(
+    runner, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        cli,
+        "session_worker_status",
+        lambda **kwargs: (_ for _ in ()).throw(RuntimeError("session status failed")),
+    )
+
+    result = runner.invoke(cli.app, ["session", "status"])
+    assert result.exit_code == 50
+    assert "session status failed" in result.output
+
+
+def test_session_stop_command_handles_runtime_exception(
+    runner, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        cli,
+        "stop_session_worker",
+        lambda: (_ for _ in ()).throw(RuntimeError("session stop failed")),
+    )
+
+    result = runner.invoke(cli.app, ["session", "stop"])
+    assert result.exit_code == 50
+    assert "session stop failed" in result.output
+
+
 def test_search_command_rejects_rerank_candidates_below_top_k(
     runner, monkeypatch: pytest.MonkeyPatch
 ) -> None:

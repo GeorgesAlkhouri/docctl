@@ -15,6 +15,21 @@ from .service_manifest import catalog_documents, load_manifest, manifest_documen
 from .service_query import search_chunks as search_chunks_impl
 from .service_query import show_chunk as show_chunk_impl
 from .service_session import run_session_requests as run_session_requests_impl
+from .service_session_worker import (
+    DEFAULT_SESSION_IDLE_TTL_SECONDS,
+)
+from .service_session_worker import (
+    exec_session_requests as exec_session_requests_impl,
+)
+from .service_session_worker import (
+    session_worker_status as session_worker_status_impl,
+)
+from .service_session_worker import (
+    start_session_worker as start_session_worker_impl,
+)
+from .service_session_worker import (
+    stop_session_worker as stop_session_worker_impl,
+)
 from .service_snapshot import export_snapshot as export_snapshot_impl
 from .service_snapshot import import_snapshot as import_snapshot_impl
 from .service_types import (
@@ -303,6 +318,79 @@ def run_session_requests(
         allow_model_download=allow_model_download,
     )
     return run_session_requests_impl(request=request, deps=_ml_dependencies())
+
+
+def start_session_worker(
+    *,
+    config: CliConfig,
+    allow_model_download: bool,
+    idle_ttl_seconds: int = DEFAULT_SESSION_IDLE_TTL_SECONDS,
+) -> dict[str, object]:
+    """Start the singleton session worker.
+
+    Args:
+        config: Resolved CLI configuration.
+        allow_model_download: Whether missing models may be downloaded.
+        idle_ttl_seconds: Idle timeout before worker self-termination.
+
+    Returns:
+        Session start payload.
+    """
+    return start_session_worker_impl(
+        config=config,
+        allow_model_download=allow_model_download,
+        idle_ttl_seconds=idle_ttl_seconds,
+        deps=_ml_dependencies(),
+    )
+
+
+def session_worker_status(*, config: CliConfig, allow_model_download: bool) -> dict[str, object]:
+    """Return singleton session worker status payload.
+
+    Args:
+        config: Resolved CLI configuration.
+        allow_model_download: Whether missing models may be downloaded.
+
+    Returns:
+        Session status payload.
+    """
+    return session_worker_status_impl(config=config, allow_model_download=allow_model_download)
+
+
+def stop_session_worker() -> dict[str, object]:
+    """Stop singleton session worker if running.
+
+    Returns:
+        Session stop payload.
+    """
+    return stop_session_worker_impl()
+
+
+def exec_session_requests(
+    *,
+    config: CliConfig,
+    request_lines: list[str],
+    allow_model_download: bool,
+    idle_ttl_seconds: int = DEFAULT_SESSION_IDLE_TTL_SECONDS,
+) -> list[dict[str, Any]]:
+    """Execute NDJSON requests through singleton session worker.
+
+    Args:
+        config: Resolved CLI configuration.
+        request_lines: NDJSON request lines to execute.
+        allow_model_download: Whether missing models may be downloaded.
+        idle_ttl_seconds: Idle timeout for auto-started workers.
+
+    Returns:
+        Response payload dictionaries for all non-empty input lines.
+    """
+    return exec_session_requests_impl(
+        config=config,
+        request_lines=request_lines,
+        allow_model_download=allow_model_download,
+        idle_ttl_seconds=idle_ttl_seconds,
+        deps=_ml_dependencies(),
+    )
 
 
 def run_doctor(*, config: CliConfig, allow_model_download: bool) -> DoctorReport:
