@@ -84,6 +84,10 @@ docctl show <chunk_id_from_search> --allow-model-download
 | `docctl catalog` | Show index summary and per-document inventory. |
 | `docctl doctor` | Run local diagnostics for index and embedding setup. |
 | `docctl session` | Run a read-only NDJSON request session on stdin/stdout. |
+| `docctl session start` | Start singleton detached session worker (errors if already running). |
+| `docctl session status` | Show singleton detached session worker status. |
+| `docctl session exec` | Execute NDJSON requests through singleton detached worker. |
+| `docctl session stop` | Stop singleton detached session worker. |
 
 ## JSON and Session Mode
 Use `--json` for deterministic machine-readable output:
@@ -99,6 +103,22 @@ cat <<'EOF' | docctl session --allow-model-download
 {"id":"q1","op":"search","query":"security gateway diagnostics","top_k":5}
 {"id":"q2","op":"catalog"}
 EOF
+```
+
+Use detached singleton worker mode when you want warm reuse across CLI invocations:
+
+```bash
+# Start singleton worker (default idle timeout: 900 seconds)
+docctl --json session start
+
+# Execute NDJSON requests through detached worker
+cat <<'EOF' | docctl session exec
+{"id":"q1","op":"search","query":"security gateway diagnostics","top_k":5}
+{"id":"q2","op":"catalog"}
+EOF
+
+# Stop worker explicitly
+docctl --json session stop
 ```
 
 ## Configuration

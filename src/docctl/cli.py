@@ -26,15 +26,20 @@ from .errors import DocctlError, EmbeddingConfigError, InternalDocctlError
 from .jsonio import dumps_json
 from .models import DoctorReport
 from .services import (
+    DEFAULT_SESSION_IDLE_TTL_SECONDS,
     collect_catalog,
     collect_stats,
+    exec_session_requests,
     export_snapshot,
     import_snapshot,
     ingest_path,
     run_doctor,
     run_session_requests,
     search_chunks,
+    session_worker_status,
     show_chunk,
+    start_session_worker,
+    stop_session_worker,
 )
 
 app = typer.Typer(
@@ -42,6 +47,12 @@ app = typer.Typer(
     no_args_is_help=True,
     help="docctl is a CLI-first local document retrieval tool.",
 )
+session_app = typer.Typer(
+    add_completion=False,
+    invoke_without_command=True,
+    help="Session control and NDJSON session execution commands.",
+)
+app.add_typer(session_app, name="session")
 
 ALLOW_MODEL_DOWNLOAD_HELP = "Allow downloading missing embedding/reranker model artifacts."
 
@@ -396,7 +407,7 @@ def import_(
         _handle_error(error)
 
 
-@app.command(help="Run a read-only NDJSON request session on stdin/stdout.")
+@session_app.callback()
 def session(
     ctx: typer.Context,
     allow_model_download: bool = typer.Option(
@@ -405,12 +416,14 @@ def session(
         help=ALLOW_MODEL_DOWNLOAD_HELP,
     ),
 ) -> None:
-    """Run a read-only NDJSON request session on standard streams.
+    """Run legacy read-only NDJSON stream mode when no subcommand is selected.
 
     Args:
         ctx: Typer context containing resolved configuration.
         allow_model_download: Whether missing embedding models may be downloaded.
     """
+    if ctx.invoked_subcommand is not None:
+        return
     config = ctx.obj
     try:
         responses = run_session_requests(
@@ -420,6 +433,118 @@ def session(
         )
         for response in responses:
             typer.echo(dumps_json(response))
+    except Exception as error:  # noqa: BLE001
+        _handle_error(error)
+
+
+@session_app.command(help="Start singleton detached session worker.")
+def start(
+    ctx: typer.Context,
+    allow_model_download: bool = typer.Option(
+        False,
+        "--allow-model-download",
+        help=ALLOW_MODEL_DOWNLOAD_HELP,
+    ),
+    idle_ttl: int = typer.Option(
+        DEFAULT_SESSION_IDLE_TTL_SECONDS,
+        "--idle-ttl",
+        min=1,
+        help="Idle timeout in seconds before worker self-termination.",
+    ),
+) -> None:
+    """Start singleton detached session worker.
+
+    Args:
+        ctx: Typer context containing resolved configuration.
+        allow_model_download: Whether missing embedding models may be downloaded.
+        idle_ttl: Idle timeout in seconds.
+    """
+    config = ctx.obj
+    try:
+        payload = start_session_worker(
+            config=config,
+            allow_model_download=allow_model_download,
+            idle_ttl_seconds=idle_ttl,
+        )
+        _emit_success(config=config, payload=payload)
+    except Exception as error:  # noqa: BLE001
+        _handle_error(error)
+
+
+@session_app.command(help="Show singleton detached session worker status.")
+def status(
+    ctx: typer.Context,
+    allow_model_download: bool = typer.Option(
+        False,
+        "--allow-model-download",
+        help=ALLOW_MODEL_DOWNLOAD_HELP,
+    ),
+) -> None:
+    """Show singleton detached session worker status.
+
+    Args:
+        ctx: Typer context containing resolved configuration.
+        allow_model_download: Whether missing embedding models may be downloaded.
+    """
+    config = ctx.obj
+    try:
+        payload = session_worker_status(
+            config=config,
+            allow_model_download=allow_model_download,
+        )
+        _emit_success(config=config, payload=payload)
+    except Exception as error:  # noqa: BLE001
+        _handle_error(error)
+
+
+@session_app.command(name="exec", help="Execute NDJSON requests through singleton session worker.")
+def exec_(
+    ctx: typer.Context,
+    allow_model_download: bool = typer.Option(
+        False,
+        "--allow-model-download",
+        help=ALLOW_MODEL_DOWNLOAD_HELP,
+    ),
+    idle_ttl: int = typer.Option(
+        DEFAULT_SESSION_IDLE_TTL_SECONDS,
+        "--idle-ttl",
+        min=1,
+        help="Idle timeout in seconds for auto-started worker.",
+    ),
+) -> None:
+    """Execute NDJSON request lines through singleton session worker.
+
+    Args:
+        ctx: Typer context containing resolved configuration.
+        allow_model_download: Whether missing embedding models may be downloaded.
+        idle_ttl: Idle timeout in seconds for auto-started worker.
+    """
+    config = ctx.obj
+    try:
+        request_lines = list(sys.stdin)
+        responses = exec_session_requests(
+            config=config,
+            request_lines=request_lines,
+            allow_model_download=allow_model_download,
+            idle_ttl_seconds=idle_ttl,
+        )
+        for response in responses:
+            typer.echo(dumps_json(response))
+    except Exception as error:  # noqa: BLE001
+        _handle_error(error)
+
+
+@session_app.command(help="Stop singleton detached session worker.")
+def stop(ctx: typer.Context) -> None:
+    """Stop singleton detached session worker.
+
+    Args:
+        ctx: Typer context containing resolved configuration.
+    """
+    config = ctx.obj
+    try:
+        payload = stop_session_worker()
+        _emit_success(config=config, payload=payload)
     except Exception as error:  # noqa: BLE001
         _handle_error(error)
 

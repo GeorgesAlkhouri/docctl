@@ -1,4 +1,4 @@
-# PSPEC-0001 CLI Contract v3 (Multi-Format Ingest, Locator-Free Retrieval)
+# PSPEC-0001 CLI Contract v4 (Singleton Session Worker Controls + Multi-Format Retrieval)
 
 ## Commands
 - `docctl ingest <path>`
@@ -10,6 +10,10 @@
 - `docctl catalog`
 - `docctl doctor`
 - `docctl session`
+- `docctl session start`
+- `docctl session status`
+- `docctl session exec`
+- `docctl session stop`
 
 ## Command Import Boundaries
 - Set A (ML-capable command path): `ingest`, `search`, `doctor`, `session`.
@@ -58,6 +62,16 @@
   - Search request accepts optional fields: `doc_id`, `source`, `title`, `min_score`, `rerank`, `rerank_candidates`.
   - Response line format: `{"id":"q1","ok":true,"result":{...}}`
   - Error response format: `{"id":"q1","ok":false,"error":{"message":"...","exit_code":NN}}`
+- `docctl session exec` uses the same NDJSON request/response contract as `docctl session`.
+
+## Singleton Session Worker
+- At most one detached worker session may run at a time.
+- `docctl session start` fails if a worker is already running.
+- `docctl session exec` auto-starts the singleton worker if none is running.
+- A running worker is bound to startup config (`index_path`, `collection`, embedding/rerank models, `allow_model_download`).
+- `docctl session exec` fails on config mismatch until `docctl session stop` is run.
+- Detached worker mode is POSIX-only.
+- Default idle timeout for detached worker mode is `900` seconds.
 
 ## Search Hit Payload
 - Base hit shape includes: `id`, `text`, `metadata`, `distance`, `score`, `rank`.
@@ -83,3 +97,5 @@
 4. Failure classes map to stable exit codes.
 5. In `--json` mode, stdout contains only deterministic JSON payloads.
 6. `session` reuses one embedding model instance across multiple search requests in one process.
+7. `session start` fails with a stable error when singleton worker is already running.
+8. `session exec` reuses the detached singleton worker and preserves NDJSON response contract.

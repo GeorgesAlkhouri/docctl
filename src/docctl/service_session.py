@@ -390,28 +390,71 @@ def run_session_requests(
         Response dictionaries containing success results or structured errors.
     """
     runtime = SessionRuntime(request=request, deps=deps)
+    yield from run_session_requests_with_runtime(
+        runtime=runtime,
+        request_lines=request.request_lines,
+        verbose=request.config.verbose,
+    )
 
-    for raw_line in request.request_lines:
-        line = raw_line.strip()
-        if not line:
-            continue
 
-        request_id: Any = None
-        try:
-            payload = _parse_payload(line)
-            request_id = payload.get("id")
-            op = _parse_operation(payload)
-            handler = _OPERATION_HANDLERS.get(op)
-            if handler is None:
-                raise DocctlError(message=f"unsupported session operation: {op}", exit_code=50)
+def run_session_requests_with_runtime(
+    *,
+    runtime: SessionRuntime,
+    request_lines: Iterable[str],
+    verbose: bool,
+) -> Iterable[dict[str, Any]]:
+    """Process NDJSON request lines using an existing session runtime.
 
-            with suppress_external_output(enabled=not request.config.verbose):
-                result = handler(runtime, payload)
+    Args:
+        runtime: Reusable session runtime containing cached dependencies.
+        request_lines: Incoming NDJSON request lines.
+        verbose: Whether verbose mode is enabled.
 
-            yield {
-                "id": request_id,
-                "ok": True,
-                "result": result,
-            }
-        except Exception as error:  # noqa: BLE001
-            yield session_error(request_id=request_id, error=error)
+    Yields:
+        Response dictionaries containing success results or structured errors.
+    """
+    for raw_line in request_lines:
+        response = run_session_request_line(runtime=runtime, raw_line=raw_line, verbose=verbose)
+        if response is not None:
+            yield response
+
+
+def run_session_request_line(
+    *,
+    runtime: SessionRuntime,
+    raw_line: str,
+    verbose: bool,
+) -> dict[str, Any] | None:
+    """Process one NDJSON request line with a reusable runtime.
+
+    Args:
+        runtime: Reusable session runtime containing cached dependencies.
+        raw_line: Raw NDJSON request line.
+        verbose: Whether verbose mode is enabled.
+
+    Returns:
+        One response payload for non-empty lines, otherwise `None`.
+    """
+    line = raw_line.strip()
+    if not line:
+        return None
+
+    request_id: Any = None
+    try:
+        payload = _parse_payload(line)
+        request_id = payload.get("id")
+        op = _parse_operation(payload)
+        handler = _OPERATION_HANDLERS.get(op)
+        if handler is None:
+            raise DocctlError(message=f"unsupported session operation: {op}", exit_code=50)
+
+        with suppress_external_output(enabled=not verbose):
+            result = handler(runtime, payload)
+
+        return {
+            "id": request_id,
+            "ok": True,
+            "result": result,
+        }
+    except Exception as error:  # noqa: BLE001
+        return session_error(request_id=request_id, error=error)
